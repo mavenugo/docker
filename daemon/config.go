@@ -30,6 +30,7 @@ type Config struct {
 	DefaultIp                   net.IP
 	BridgeIface                 string
 	BridgeIP                    string
+	BridgeType                  string
 	FixedCIDR                   string
 	InsecureRegistries          []string
 	InterContainerCommunication bool
@@ -54,6 +55,7 @@ func (config *Config) InstallFlags() {
 	flag.BoolVar(&config.EnableIpForward, []string{"#ip-forward", "-ip-forward"}, true, "Enable net.ipv4.ip_forward")
 	flag.BoolVar(&config.EnableIpMasq, []string{"-ip-masq"}, true, "Enable IP masquerading for bridge's IP range")
 	flag.StringVar(&config.BridgeIP, []string{"#bip", "-bip"}, "", "Use this CIDR notation address for the network bridge's IP, not compatible with -b")
+	flag.StringVar(&config.BridgeType, []string{"#btype", "-btype"}, "linux", "Select a type of bridge to be used. It can be either of linux, ovs or other bridges installed in this host")
 	flag.StringVar(&config.BridgeIface, []string{"b", "-bridge"}, "", "Attach containers to a pre-existing network bridge\nuse 'none' to disable container networking")
 	flag.StringVar(&config.FixedCIDR, []string{"-fixed-cidr"}, "", "IPv4 subnet for fixed IPs (ex: 10.20.0.0/16)\nthis subnet must be nested in the bridge subnet (which is defined by -b or --bip)")
 	opts.ListVar(&config.InsecureRegistries, []string{"-insecure-registry"}, "Enable insecure communication with specified registries (no certificate verification for HTTPS and enable HTTP fallback) (e.g., localhost:5000 or 10.20.0.0/16)")
