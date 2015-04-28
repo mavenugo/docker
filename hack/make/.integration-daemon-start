@@ -15,11 +15,13 @@ exec 41>&1 42>&2
 export DOCKER_GRAPHDRIVER=${DOCKER_GRAPHDRIVER:-vfs}
 export DOCKER_EXECDRIVER=${DOCKER_EXECDRIVER:-native}
 
+export DHOST=unix:///var/run/docker_test.sock
 if [ -z "$DOCKER_TEST_HOST" ]; then
-	export DOCKER_HOST="unix://$(cd "$DEST" && pwd)/docker.sock" # "pwd" tricks to make sure $DEST is an absolute path, not a relative one
+	#export DOCKER_HOST="unix://$(cd "$DEST" && pwd)/docker.sock" # "pwd" tricks to make sure $DEST is an absolute path, not a relative one
+        export DOCKER_HOST="$DHOST"
 	( set -x; exec \
 		docker --daemon --debug \
-		--host "$DOCKER_HOST" \
+		--host "$DHOST" \
 		--storage-driver "$DOCKER_GRAPHDRIVER" \
 		--exec-driver "$DOCKER_EXECDRIVER" \
 		--pidfile "$DEST/docker.pid" \

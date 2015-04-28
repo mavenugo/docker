@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	"time"
 
 	"github.com/docker/libcontainer/label"
+	"github.com/docker/libnetwork"
+	"github.com/docker/libnetwork/pkg/options"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api"
@@ -26,7 +29,6 @@ import (
 	"github.com/docker/docker/daemon/graphdriver"
 	_ "github.com/docker/docker/daemon/graphdriver/vfs"
 	"github.com/docker/docker/daemon/network"
-	"github.com/docker/docker/daemon/networkdriver/bridge"
 	"github.com/docker/docker/graph"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/pkg/archive"
@@ -109,6 +111,7 @@ type Daemon struct {
 	defaultLogConfig runconfig.LogConfig
 	RegistryService  *registry.Service
 	EventsService    *events.Events
+	netController    libnetwork.NetworkController
 }
 
 // Get looks for a container using the provided information, which could be
@@ -731,6 +734,8 @@ func (daemon *Daemon) RegisterLinks(container *Container, hostConfig *runconfig.
 }
 
 func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemon, err error) {
+	var netController libnetwork.NetworkController
+
 	if config.Mtu == 0 {
 		config.Mtu = getDefaultNetworkMtu()
 	}
@@ -875,8 +880,9 @@ func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemo
 	}
 
 	if !config.DisableNetwork {
-		if err := bridge.InitDriver(&config.Bridge); err != nil {
-			return nil, fmt.Errorf("Error initializing Bridge: %v", err)
+		netController, err = initNetworkController(config)
+		if err != nil {
+			return nil, fmt.Errorf("Error initializing network controller: %v", err)
 		}
 	}
 
@@ -931,6 +937,7 @@ func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemo
 	d.defaultLogConfig = config.LogConfig
 	d.RegistryService = registryService
 	d.EventsService = eventsService
+	d.netController = netController
 
 	if err := d.restore(); err != nil {
 		return nil, err
@@ -942,6 +949,88 @@ func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemo
 	}
 
 	return d, nil
+}
+
+func initNetworkController(config *Config) (libnetwork.NetworkController, error) {
+	controller := libnetwork.New()
+
+	// Initialize default driver "null"
+	err := controller.ConfigureNetworkDriver("null", options.Generic{})
+	if err != nil {
+		return nil, fmt.Errorf("Error initializing null driver: %v", err)
+	}
+
+	// Initialize default network on "null"
+	_, err = controller.NewNetwork("null", "none", nil)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating default \"null\" network: %v", err)
+	}
+
+	// Initialize default driver "host"
+	err = controller.ConfigureNetworkDriver("host", options.Generic{})
+	if err != nil {
+		return nil, fmt.Errorf("Error initializing host driver: %v", err)
+	}
+
+	// Initialize default network on "host"
+	_, err = controller.NewNetwork("host", "host", nil)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating default \"host\" network: %v", err)
+	}
+
+	// Initialize default driver "bridge"
+	option := options.Generic{
+		"BridgeName":         config.Bridge.Iface,
+		"EnableIPv6":         config.Bridge.EnableIPv6,
+		"EnableIPTables":     config.Bridge.EnableIptables,
+		"EnableIPMasquerade": config.Bridge.EnableIpMasq,
+		"EnableICC":          config.Bridge.InterContainerCommunication,
+		"EnableIPForwarding": config.Bridge.EnableIpForward}
+
+	if config.Bridge.IP != "" {
+		ip, bipNet, err := net.ParseCIDR(config.Bridge.IP)
+		if err != nil {
+			return nil, err
+		}
+
+		bipNet.IP = ip
+		option["AddressIPv4"] = bipNet
+	}
+
+	if config.Bridge.FixedCIDR != "" {
+		_, fCIDR, err := net.ParseCIDR(config.Bridge.FixedCIDR)
+		if err != nil {
+			return nil, err
+		}
+
+		option["FixedCIDR"] = fCIDR
+	}
+
+	if config.Bridge.FixedCIDRv6 != "" {
+		_, fCIDRv6, err := net.ParseCIDR(config.Bridge.FixedCIDRv6)
+		if err != nil {
+			return nil, err
+		}
+
+		option["FixedCIDRv6"] = fCIDRv6
+	}
+
+	err = controller.ConfigureNetworkDriver("bridge", options.Generic{options.GenericData: option})
+	if err != nil {
+		return nil, fmt.Errorf("Error initializing bridge driver: %v", err)
+	}
+
+	// Initialize default network on "bridge" with the same name
+	_, err = controller.NewNetwork("bridge", "bridge", nil)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating default \"bridge\" network: %v", err)
+	}
+
+	return controller, nil
+	/*
+		if err := bridge.InitDriver(&config.Bridge); err != nil {
+			return nil, fmt.Errorf("Error initializing Bridge: %v", err)
+		}*/
 }
 
 func (daemon *Daemon) Shutdown() error {

@@ -78,7 +78,7 @@ ENV GO_VERSION 1.4.2
 RUN curl -sSL https://golang.org/dl/go${GO_VERSION}.src.tar.gz | tar -v -C /usr/local -xz \
 	&& mkdir -p /go/bin
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
-ENV GOPATH /go:/go/src/github.com/docker/docker/vendor
+ENV GOPATH /go:/go/src/github.com/docker/docker/vendor:/go/src/github.com/docker/docker/vendor/src/github.com/docker/libnetwork/Godeps/_workspace
 RUN cd /usr/local/go/src && ./make.bash --no-clean 2>&1
 
 # Compile Go for cross compilation

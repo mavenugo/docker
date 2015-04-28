@@ -8,12 +8,12 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/daemon/network"
 	"github.com/docker/docker/daemon/networkdriver"
 	"github.com/docker/docker/daemon/networkdriver/ipallocator"
 	"github.com/docker/docker/daemon/networkdriver/portmapper"
@@ -568,6 +568,7 @@ func linkLocalIPv6FromMac(mac string) (string, error) {
 	return fmt.Sprintf("fe80::%x%x:%xff:fe%x:%x%x/64", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]), nil
 }
 
+/*
 // Allocate a network interface
 func Allocate(id, requestedMac, requestedIP, requestedIPv6 string) (*network.Settings, error) {
 	var (
@@ -631,19 +632,19 @@ func Allocate(id, requestedMac, requestedIP, requestedIPv6 string) (*network.Set
 	localIPv6, _, _ := net.ParseCIDR(localIPv6Net)
 
 	networkSettings := &network.Settings{
-		IPAddress:            ip.String(),
-		Gateway:              defaultGWIPv4.String(),
-		MacAddress:           mac.String(),
-		Bridge:               bridgeIface,
-		IPPrefixLen:          maskSize,
-		LinkLocalIPv6Address: localIPv6.String(),
+			IPAddress:            ip.String(),
+			Gateway:              defaultGWIPv4.String(),
+			MacAddress:           mac.String(),
+			Bridge:               bridgeIface,
+			IPPrefixLen:          maskSize,
+			LinkLocalIPv6Address: localIPv6.String(),
 	}
 
 	if globalIPv6Network != nil {
-		networkSettings.GlobalIPv6Address = globalIPv6.String()
-		maskV6Size, _ := globalIPv6Network.Mask.Size()
-		networkSettings.GlobalIPv6PrefixLen = maskV6Size
-		networkSettings.IPv6Gateway = defaultGWIPv6.String()
+		 		networkSettings.GlobalIPv6Address = globalIPv6.String()
+		   		maskV6Size, _ := globalIPv6Network.Mask.Size()
+		   		networkSettings.GlobalIPv6PrefixLen = maskV6Size
+		   		networkSettings.IPv6Gateway = defaultGWIPv6.String()
 	}
 
 	currentInterfaces.Set(id, &networkInterface{
@@ -653,13 +654,14 @@ func Allocate(id, requestedMac, requestedIP, requestedIPv6 string) (*network.Set
 
 	return networkSettings, nil
 }
-
+*/
 // Release an interface for a select ip
 func Release(id string) {
 	var containerInterface = currentInterfaces.Get(id)
 
 	if containerInterface == nil {
 		logrus.Warnf("No network information to release for %s", id)
+		debug.PrintStack()
 		return
 	}
 
