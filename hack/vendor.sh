@@ -59,6 +59,8 @@ clone git github.com/go-fsnotify/fsnotify v1.0.4
 
 clone git github.com/go-check/check 64131543e7896d5bcc6bd5a76287eb75ea96c673
 
+clone git github.com/mrjana/libnetwork 564be7134c8037c9a02c9bfdd07082e6bde69432
+
 # get distribution packages
 clone git github.com/docker/distribution d957768537c5af40e4f4cd96871f7b2bde9e2923
 mv src/github.com/docker/distribution/digest tmp-digest
