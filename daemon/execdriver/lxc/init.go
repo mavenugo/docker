@@ -31,6 +31,7 @@ type InitArgs struct {
 	Root       string
 	CapAdd     string
 	CapDrop    string
+	NetNsPath  string
 }
 
 func init() {
@@ -83,6 +84,7 @@ func getArgs() *InitArgs {
 		gateway    = flag.String("g", "", "gateway address")
 		ip         = flag.String("i", "", "ip address")
 		workDir    = flag.String("w", "", "workdir")
+		netNsPath  = flag.String("n", "", "netns path")
 		privileged = flag.Bool("privileged", false, "privileged mode")
 		mtu        = flag.Int("mtu", 1500, "interface mtu")
 		capAdd     = flag.String("cap-add", "", "capabilities to add")
@@ -101,6 +103,7 @@ func getArgs() *InitArgs {
 		Mtu:        *mtu,
 		CapAdd:     *capAdd,
 		CapDrop:    *capDrop,
+		NetNsPath:  *netNsPath,
 	}
 }
 

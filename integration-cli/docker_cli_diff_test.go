@@ -88,6 +88,7 @@ func (s *DockerSuite) TestDiffEnsureOnlyKmsgAndPtmx(c *check.C) {
 		"A /dev/full":    true, // busybox
 		"C /dev/ptmx":    true, // libcontainer
 		"A /dev/kmsg":    true, // lxc
+		"A /.netns":      true, // lxc
 		"A /dev/fd":      true,
 		"A /dev/fuse":    true,
 		"A /dev/ptmx":    true,

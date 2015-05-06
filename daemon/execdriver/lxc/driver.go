@@ -87,6 +87,10 @@ func (d *driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallba
 		dataPath = d.containerDir(c.ID)
 	)
 
+	if c.Network.NamespacePath == "" && c.Network.ContainerID == "" {
+		return execdriver.ExitStatus{ExitCode: -1}, fmt.Errorf("empty sandbox key for non-container network")
+	}
+
 	container, err := d.createContainer(c)
 	if err != nil {
 		return execdriver.ExitStatus{ExitCode: -1}, err
@@ -115,6 +119,15 @@ func (d *driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallba
 		Writable:    false,
 		Private:     true,
 	})
+
+	if c.Network.ContainerID == "" {
+		c.Mounts = append(c.Mounts, execdriver.Mount{
+			Source:      c.Network.NamespacePath,
+			Destination: "/.netns",
+			Writable:    false,
+			Private:     true,
+		})
+	}
 
 	if err := d.generateEnvConfig(c); err != nil {
 		return execdriver.ExitStatus{ExitCode: -1}, err
@@ -157,18 +170,13 @@ func (d *driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallba
 		"--",
 		c.InitPath,
 	)
-	if c.Network.Interface != nil {
-		params = append(params,
-			"-g", c.Network.Interface.Gateway,
-			"-i", fmt.Sprintf("%s/%d", c.Network.Interface.IPAddress, c.Network.Interface.IPPrefixLen),
-		)
-	}
-	params = append(params,
-		"-mtu", strconv.Itoa(c.Network.Mtu),
-	)
 
 	if c.ProcessConfig.User != "" {
 		params = append(params, "-u", c.ProcessConfig.User)
+	}
+
+	if c.Network.ContainerID == "" {
+		params = append(params, "-n", "/.netns")
 	}
 
 	if c.ProcessConfig.Privileged {

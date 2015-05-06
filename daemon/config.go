@@ -1,8 +1,8 @@
 package daemon
 
 import (
-	"github.com/docker/docker/daemon/networkdriver"
-	"github.com/docker/docker/daemon/networkdriver/bridge"
+	"net"
+
 	"github.com/docker/docker/opts"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/runconfig"
@@ -17,7 +17,7 @@ const (
 // common across platforms.
 type CommonConfig struct {
 	AutoRestart    bool
-	Bridge         bridge.Config
+	Bridge         bridgeConfig
 	Context        map[string][]string
 	CorsHeaders    string
 	DisableNetwork bool
@@ -32,6 +32,24 @@ type CommonConfig struct {
 	Pidfile        string
 	Root           string
 	TrustKeyPath   string
+}
+
+// bridgeConfig stores all the bridge driver specific
+// configuration.
+type bridgeConfig struct {
+	EnableIPv6                  bool
+	EnableIptables              bool
+	EnableIpForward             bool
+	EnableIpMasq                bool
+	EnableUserlandProxy         bool
+	DefaultIp                   net.IP
+	Iface                       string
+	IP                          string
+	FixedCIDR                   string
+	FixedCIDRv6                 string
+	DefaultGatewayIPv4          string
+	DefaultGatewayIPv6          string
+	InterContainerCommunication bool
 }
 
 // InstallCommonFlags adds command-line options to the top-level flag parser for
@@ -67,11 +85,4 @@ func (config *Config) InstallCommonFlags() {
 	opts.LogOptsVar(config.LogConfig.Config, []string{"-log-opt"}, "Set log driver options")
 	flag.BoolVar(&config.Bridge.EnableUserlandProxy, []string{"-userland-proxy"}, true, "Use userland proxy for loopback traffic")
 
-}
-
-func getDefaultNetworkMtu() int {
-	if iface, err := networkdriver.GetDefaultRouteIface(); err == nil {
-		return iface.MTU
-	}
-	return defaultNetworkMtu
 }

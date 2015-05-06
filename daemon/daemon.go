@@ -1,10 +1,10 @@
 package daemon
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,6 +15,9 @@ import (
 	"time"
 
 	"github.com/docker/libcontainer/label"
+	"github.com/docker/libnetwork"
+	"github.com/docker/libnetwork/pkg/netlabel"
+	"github.com/docker/libnetwork/pkg/options"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api"
@@ -26,7 +29,6 @@ import (
 	_ "github.com/docker/docker/daemon/graphdriver/vfs"
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/daemon/network"
-	"github.com/docker/docker/daemon/networkdriver/bridge"
 	"github.com/docker/docker/graph"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/pkg/archive"
@@ -37,7 +39,6 @@ import (
 	"github.com/docker/docker/pkg/namesgenerator"
 	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/docker/pkg/parsers/kernel"
-	"github.com/docker/docker/pkg/resolvconf"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/sysinfo"
 	"github.com/docker/docker/pkg/truncindex"
@@ -46,8 +47,6 @@ import (
 	"github.com/docker/docker/trust"
 	"github.com/docker/docker/utils"
 	"github.com/docker/docker/volumes"
-
-	"github.com/go-fsnotify/fsnotify"
 )
 
 var (
@@ -109,6 +108,7 @@ type Daemon struct {
 	defaultLogConfig runconfig.LogConfig
 	RegistryService  *registry.Service
 	EventsService    *events.Events
+	netController    libnetwork.NetworkController
 }
 
 // Get looks for a container using the provided information, which could be
@@ -343,61 +343,6 @@ func (daemon *Daemon) restore() error {
 		logrus.Info("Loading containers: done.")
 	}
 
-	return nil
-}
-
-// set up the watch on the host's /etc/resolv.conf so that we can update container's
-// live resolv.conf when the network changes on the host
-func (daemon *Daemon) setupResolvconfWatcher() error {
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-
-	//this goroutine listens for the events on the watch we add
-	//on the resolv.conf file on the host
-	go func() {
-		for {
-			select {
-			case event := <-watcher.Events:
-				if event.Name == "/etc/resolv.conf" &&
-					(event.Op&(fsnotify.Write|fsnotify.Create) != 0) {
-					// verify a real change happened before we go further--a file write may have happened
-					// without an actual change to the file
-					updatedResolvConf, newResolvConfHash, err := resolvconf.GetIfChanged()
-					if err != nil {
-						logrus.Debugf("Error retrieving updated host resolv.conf: %v", err)
-					} else if updatedResolvConf != nil {
-						// because the new host resolv.conf might have localhost nameservers..
-						updatedResolvConf, modified := resolvconf.FilterResolvDns(updatedResolvConf, daemon.config.Bridge.EnableIPv6)
-						if modified {
-							// changes have occurred during localhost cleanup: generate an updated hash
-							newHash, err := ioutils.HashData(bytes.NewReader(updatedResolvConf))
-							if err != nil {
-								logrus.Debugf("Error generating hash of new resolv.conf: %v", err)
-							} else {
-								newResolvConfHash = newHash
-							}
-						}
-						logrus.Debug("host network resolv.conf changed--walking container list for updates")
-						contList := daemon.containers.List()
-						for _, container := range contList {
-							if err := container.updateResolvConf(updatedResolvConf, newResolvConfHash); err != nil {
-								logrus.Debugf("Error on resolv.conf update check for container ID: %s: %v", container.ID, err)
-							}
-						}
-					}
-				}
-			case err := <-watcher.Errors:
-				logrus.Debugf("host resolv.conf notify error: %v", err)
-			}
-		}
-	}()
-
-	if err := watcher.Add("/etc"); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -722,9 +667,8 @@ func (daemon *Daemon) RegisterLinks(container *Container, hostConfig *runconfig.
 }
 
 func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemon, err error) {
-	if config.Mtu == 0 {
-		config.Mtu = getDefaultNetworkMtu()
-	}
+	var netController libnetwork.NetworkController
+
 	// Check for mutually incompatible config options
 	if config.Bridge.Iface != "" && config.Bridge.IP != "" {
 		return nil, fmt.Errorf("You specified -b & --bip, mutually exclusive options. Please specify only one.")
@@ -877,8 +821,9 @@ func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemo
 	}
 
 	if !config.DisableNetwork {
-		if err := bridge.InitDriver(&config.Bridge); err != nil {
-			return nil, fmt.Errorf("Error initializing Bridge: %v", err)
+		netController, err = initNetworkController(config)
+		if err != nil {
+			return nil, fmt.Errorf("Error initializing network controller: %v", err)
 		}
 	}
 
@@ -933,17 +878,110 @@ func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemo
 	d.defaultLogConfig = config.LogConfig
 	d.RegistryService = registryService
 	d.EventsService = eventsService
+	d.netController = netController
 
 	if err := d.restore(); err != nil {
 		return nil, err
 	}
 
-	// set up filesystem watch on resolv.conf for network changes
-	if err := d.setupResolvconfWatcher(); err != nil {
-		return nil, err
+	return d, nil
+}
+
+func initNetworkController(config *Config) (libnetwork.NetworkController, error) {
+	controller, err := libnetwork.New()
+	if err != nil {
+		return nil, fmt.Errorf("error obtaining controller instance: %v", err)
 	}
 
-	return d, nil
+	// Initialize default driver "null"
+	err = controller.ConfigureNetworkDriver("null", options.Generic{})
+	if err != nil {
+		return nil, fmt.Errorf("Error initializing null driver: %v", err)
+	}
+
+	// Initialize default network on "null"
+	_, err = controller.NewNetwork("null", "none")
+	if err != nil {
+		return nil, fmt.Errorf("Error creating default \"null\" network: %v", err)
+	}
+
+	// Initialize default driver "host"
+	err = controller.ConfigureNetworkDriver("host", options.Generic{})
+	if err != nil {
+		return nil, fmt.Errorf("Error initializing host driver: %v", err)
+	}
+
+	// Initialize default network on "host"
+	_, err = controller.NewNetwork("host", "host")
+	if err != nil {
+		return nil, fmt.Errorf("Error creating default \"host\" network: %v", err)
+	}
+
+	// Initialize default driver "bridge"
+	option := options.Generic{
+		"EnableIPForwarding": config.Bridge.EnableIpForward}
+
+	err = controller.ConfigureNetworkDriver("bridge", options.Generic{netlabel.GenericData: option})
+	if err != nil {
+		return nil, fmt.Errorf("Error initializing bridge driver: %v", err)
+	}
+
+	netOption := options.Generic{
+		"BridgeName":         config.Bridge.Iface,
+		"Mtu":                config.Mtu,
+		"EnableIPTables":     config.Bridge.EnableIptables,
+		"EnableIPMasquerade": config.Bridge.EnableIpMasq,
+		"EnableICC":          config.Bridge.InterContainerCommunication,
+	}
+
+	if config.Bridge.IP != "" {
+		ip, bipNet, err := net.ParseCIDR(config.Bridge.IP)
+		if err != nil {
+			return nil, err
+		}
+
+		bipNet.IP = ip
+		netOption["AddressIPv4"] = bipNet
+	}
+
+	if config.Bridge.FixedCIDR != "" {
+		_, fCIDR, err := net.ParseCIDR(config.Bridge.FixedCIDR)
+		if err != nil {
+			return nil, err
+		}
+
+		netOption["FixedCIDR"] = fCIDR
+	}
+
+	if config.Bridge.FixedCIDRv6 != "" {
+		_, fCIDRv6, err := net.ParseCIDR(config.Bridge.FixedCIDRv6)
+		if err != nil {
+			return nil, err
+		}
+
+		netOption["FixedCIDRv6"] = fCIDRv6
+	}
+
+	// --ip processing
+	if config.Bridge.DefaultIp != nil {
+		netOption["DefaultBindingIP"] = config.Bridge.DefaultIp
+	}
+
+	// Initialize default network on "bridge" with the same name
+	_, err = controller.NewNetwork("bridge", "bridge",
+		libnetwork.NetworkOptionGeneric(options.Generic{
+			netlabel.GenericData: netOption,
+			netlabel.EnableIPv6:  config.Bridge.EnableIPv6,
+		}))
+	if err != nil {
+		return nil, fmt.Errorf("Error creating default \"bridge\" network: %v", err)
+	}
+
+	return controller, nil
+	/*
+		if err := bridge.InitDriver(&config.Bridge); err != nil {
+			return nil, fmt.Errorf("Error initializing Bridge: %v", err)
+		}*/
 }
 
 func (daemon *Daemon) Shutdown() error {
