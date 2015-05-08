@@ -1,6 +1,6 @@
 package plugins
 
-import plug "github.com/docker/docker/plugins"
+import plug "github.com/docker/docker/pkg/plugins"
 
 // currently created by hand. generation tool would generate this like:
 // $ rpc-gen volume/plugins/api.go VolumeDriver > volume/plugins/proxy.go

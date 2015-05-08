@@ -18,10 +18,10 @@ import (
 	"github.com/docker/docker/pkg/homedir"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/pkg/pidfile"
+	"github.com/docker/docker/pkg/plugins"
 	"github.com/docker/docker/pkg/signal"
 	"github.com/docker/docker/pkg/system"
 	"github.com/docker/docker/pkg/timeutils"
-	"github.com/docker/docker/plugins"
 	"github.com/docker/docker/registry"
 )
 
