@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/nat"
-	"github.com/docker/docker/pkg/resolvconf"
+	"github.com/docker/libnetwork/pkg/resolvconf"
 	"github.com/go-check/check"
 )
 

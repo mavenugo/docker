@@ -25,7 +25,6 @@ import (
 	"github.com/docker/docker/daemon/logger"
 	"github.com/docker/docker/daemon/logger/jsonfilelog"
 	"github.com/docker/docker/daemon/network"
-	"github.com/docker/docker/daemon/networkdriver/bridge"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/links"
 	"github.com/docker/docker/nat"
@@ -1591,23 +1590,6 @@ func (container *Container) waitForStart() error {
 		return err
 	}
 
-	return nil
-}
-
-func (container *Container) allocatePort(port nat.Port, bindings nat.PortMap) error {
-	binding := bindings[port]
-	if container.hostConfig.PublishAllPorts && len(binding) == 0 {
-		binding = append(binding, nat.PortBinding{})
-	}
-
-	for i := 0; i < len(binding); i++ {
-		b, err := bridge.AllocatePort(container.ID, port, binding[i])
-		if err != nil {
-			return err
-		}
-		binding[i] = b
-	}
-	bindings[port] = binding
 	return nil
 }
 

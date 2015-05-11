@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/pkg/iptables"
+	"github.com/docker/libnetwork/pkg/iptables"
 	"github.com/docker/libtrust"
 	"github.com/go-check/check"
 )
