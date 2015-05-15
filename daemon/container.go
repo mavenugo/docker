@@ -33,6 +33,7 @@ import (
 	"github.com/docker/docker/pkg/directory"
 	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/docker/pkg/jsonlog"
+	"github.com/docker/docker/pkg/plugins"
 	"github.com/docker/docker/pkg/promise"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/symlink"
@@ -892,18 +893,32 @@ func (container *Container) buildCreateEndpointOptions() ([]libnetwork.EndpointO
 
 func (container *Container) AllocateNetwork() error {
 	mode := container.hostConfig.NetworkMode
+	networkName := string(mode)
 	if container.Config.NetworkDisabled || mode.IsContainer() {
 		return nil
 	}
 
 	var err error
 
-	n, err := container.daemon.netController.NetworkByName(string(mode))
+	parse := strings.Split(networkName, ":")
+	driver := ""
+	if len(parse) > 1 {
+		_, err := plugins.Get(parse[0], "Network-Driver")
+		if err != nil {
+			logrus.Errorf("Error Loading Plugin for type : %s / network %s", parse[0], parse[1])
+		}
+		networkName = parse[1]
+		driver = parse[0]
+	}
+	n, err := container.daemon.netController.NetworkByName(networkName)
 	if err != nil {
-		return fmt.Errorf("error locating network with name %s: %v", string(mode), err)
+		return fmt.Errorf("error locating network with name %s: %v", networkName, err)
 	}
 	if n == nil {
-		return fmt.Errorf("no network found for network name %s", string(mode))
+		n, err = container.daemon.netController.NewNetwork(driver, networkName)
+		if err != nil {
+			return fmt.Errorf("Failed to create network %s[%s] %v", networkName, driver, err)
+		}
 	}
 
 	createOptions, err := container.buildCreateEndpointOptions()

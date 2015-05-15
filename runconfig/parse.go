@@ -478,8 +478,6 @@ func parseNetMode(netMode string) (NetworkMode, error) {
 		if len(parts) < 2 || parts[1] == "" {
 			return "", fmt.Errorf("invalid container format container:<name|id>")
 		}
-	default:
-		return "", fmt.Errorf("invalid --net: %s", netMode)
 	}
 	return NetworkMode(netMode), nil
 }
