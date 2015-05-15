@@ -3,6 +3,8 @@ package remote
 import (
 	"errors"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/pkg/plugins"
 	"github.com/docker/libnetwork/driverapi"
 	"github.com/docker/libnetwork/sandbox"
 	"github.com/docker/libnetwork/types"
@@ -13,10 +15,34 @@ var errNoCallback = errors.New("No Callback handler registered with Driver")
 const remoteNetworkType = "remote"
 
 type driver struct {
+	callback    driverapi.DriverCallback
+	endpoint    *plugins.Client
+	networkType string
+}
+
+// Internal Convenience method to register a remote driver.
+// The implementation of this method will change based on the dynamic driver registration design
+func (d *driver) registerRemoteDriver(networkType string, client *plugins.Client) (driverapi.Driver, error) {
+	newDriver := &driver{networkType: networkType, endpoint: client}
+	if d.callback == nil {
+		return nil, errNoCallback
+	}
+	if err := d.callback.RegisterDriver(networkType, newDriver); err != nil {
+		return nil, err
+	}
+	return newDriver, nil
 }
 
 // Init does the necessary work to register remote drivers
 func Init(dc driverapi.DriverCallback) error {
+	d := &driver{}
+	d.callback = dc
+	plugins.Handle("Network-Driver", func(name string, client *plugins.Client) {
+		logrus.Infof("New Network-Driver %s (%v) registered", name, client)
+		// Handhake happens here with the Plugin and networkType managed by that plugin is determined.
+		networkType := name
+		d.registerRemoteDriver(networkType, client)
+	})
 	return nil
 }
 
@@ -25,7 +51,8 @@ func (d *driver) Config(option map[string]interface{}) error {
 }
 
 func (d *driver) CreateNetwork(id types.UUID, option map[string]interface{}) error {
-	return driverapi.ErrNotImplemented
+	logrus.Infof("Successfully received CreateNetwork call for id=%s with Type=%s", id, d.networkType)
+	return nil
 }
 
 func (d *driver) DeleteNetwork(nid types.UUID) error {
@@ -33,7 +60,8 @@ func (d *driver) DeleteNetwork(nid types.UUID) error {
 }
 
 func (d *driver) CreateEndpoint(nid, eid types.UUID, epOptions map[string]interface{}) (*sandbox.Info, error) {
-	return nil, driverapi.ErrNotImplemented
+	logrus.Infof("Successfully received CreateEndpoint call for id=%s/%s with Type=%s", nid, eid, d.networkType)
+	return nil, nil
 }
 
 func (d *driver) DeleteEndpoint(nid, eid types.UUID) error {
@@ -55,5 +83,5 @@ func (d *driver) Leave(nid, eid types.UUID, options map[string]interface{}) erro
 }
 
 func (d *driver) Type() string {
-	return remoteNetworkType
+	return d.networkType
 }

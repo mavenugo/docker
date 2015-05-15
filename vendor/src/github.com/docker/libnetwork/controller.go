@@ -48,6 +48,8 @@ package libnetwork
 import (
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/pkg/plugins"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/libnetwork/driverapi"
 	"github.com/docker/libnetwork/sandbox"
@@ -125,6 +127,7 @@ func (c *controller) RegisterDriver(networkType string, driver driverapi.Driver)
 	if _, ok := c.drivers[networkType]; ok {
 		return driverapi.ErrActiveRegistration(networkType)
 	}
+	log.Infof("Libnetwork registers %s successfully", networkType)
 	c.drivers[networkType] = driver
 	return nil
 }
@@ -140,7 +143,10 @@ func (c *controller) NewNetwork(networkType, name string, options ...NetworkOpti
 	d, ok := c.drivers[networkType]
 	c.Unlock()
 	if !ok {
-		return nil, ErrInvalidNetworkDriver
+		_, err := c.loadPlugin(networkType)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Check if a network already exists with the specified network name
@@ -270,4 +276,16 @@ func (c *controller) sandboxGet(key string) sandbox.Sandbox {
 	}
 
 	return sData.sandbox
+}
+
+func (c *controller) loadPlugin(networkType string) (driverapi.Driver, error) {
+	_, err := plugins.Get(networkType, "Network-Driver")
+	if err != nil {
+		return nil, err
+	}
+	d, ok := c.drivers[networkType]
+	if !ok {
+		return nil, ErrInvalidNetworkDriver
+	}
+	return d, nil
 }
