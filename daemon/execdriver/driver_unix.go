@@ -23,6 +23,7 @@ type Network struct {
 	ContainerID    string `json:"container_id"` // id of the container to join network.
 	NamespacePath  string `json:"namespace_path"`
 	HostNetworking bool   `json:"host_networking"`
+	ControllerID   string `json:"controller_id"` // id of the container to join network.
 }
 
 // InitContainer is the initialization of a container config.

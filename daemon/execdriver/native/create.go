@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/docker/docker/daemon/execdriver"
+	"github.com/docker/libnetwork"
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
@@ -135,11 +136,14 @@ func (d *Driver) createNetwork(container *configs.Config, c *execdriver.Command)
 		return nil
 	}
 
-	if c.Network.NamespacePath == "" {
-		return fmt.Errorf("network namespace path is empty")
+	container.Hooks = &configs.Hooks{
+		Prestart: []configs.Hook{
+			configs.NewFunctionHook(func(s *configs.HookState) error {
+				path := fmt.Sprintf("/proc/%d/ns/net", s.Pid)
+				return libnetwork.SetExternalKey(c.Network.ControllerID, c.ID, path)
+			}),
+		},
 	}
-
-	container.Namespaces.Add(configs.NEWNET, c.Network.NamespacePath)
 	return nil
 }
 

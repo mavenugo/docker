@@ -176,6 +176,7 @@ func populateCommand(c *Container, env []string) error {
 	if !c.Config.NetworkDisabled {
 		en = &execdriver.Network{
 			NamespacePath: c.NetworkSettings.SandboxKey,
+			ControllerID:  c.daemon.netController.ID(),
 		}
 
 		parts := strings.SplitN(string(c.hostConfig.NetworkMode), ":", 2)
@@ -405,6 +406,10 @@ func (container *Container) buildSandboxOptions() ([]libnetwork.SandboxOption, e
 		sboxOptions = append(sboxOptions, libnetwork.OptionUseDefaultSandbox())
 		sboxOptions = append(sboxOptions, libnetwork.OptionOriginHostsPath("/etc/hosts"))
 		sboxOptions = append(sboxOptions, libnetwork.OptionOriginResolvConfPath("/etc/resolv.conf"))
+	} else {
+		// OptionUseExternalKey is mandatory for userns support.
+		// But optional for non-userns support
+		sboxOptions = append(sboxOptions, libnetwork.OptionUseExternalKey())
 	}
 
 	container.HostsPath, err = container.getRootResourcePath("hosts")
@@ -915,8 +920,6 @@ func (container *Container) configureNetwork(networkName, service, networkDriver
 			return err
 		}
 	}
-
-	container.updateSandboxNetworkSettings(sb)
 
 	if err := ep.Join(sb); err != nil {
 		return err
