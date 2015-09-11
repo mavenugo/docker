@@ -12,7 +12,7 @@ import (
 )
 
 // Exec implements the exec driver Driver interface.
-func (d *Driver) Exec(c *execdriver.Command, processConfig *execdriver.ProcessConfig, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (int, error) {
+func (d *Driver) Exec(c *execdriver.Command, processConfig *execdriver.ProcessConfig, pipes *execdriver.Pipes, startCallback execdriver.DriverCallback) (int, error) {
 
 	var (
 		term     execdriver.Terminal

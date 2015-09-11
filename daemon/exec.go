@@ -267,7 +267,7 @@ func (d *Daemon) ContainerExecStart(execName string, stdin io.ReadCloser, stdout
 }
 
 // Exec calls the underlying exec driver to run
-func (d *Daemon) Exec(c *Container, ExecConfig *ExecConfig, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (int, error) {
+func (d *Daemon) Exec(c *Container, ExecConfig *ExecConfig, pipes *execdriver.Pipes, startCallback execdriver.DriverCallback) (int, error) {
 	exitStatus, err := d.execDriver.Exec(c.command, ExecConfig.ProcessConfig, pipes, startCallback)
 
 	// On err, make sure we don't leave ExitCode at zero

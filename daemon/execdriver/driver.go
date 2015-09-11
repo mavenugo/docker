@@ -24,10 +24,16 @@ var (
 	ErrDriverNotFound          = errors.New("The requested docker init has not been found")
 )
 
-// StartCallback defines a callback function.
+const (
+	PreStartFunc = iota
+	StartFunc
+	PostStartFunc
+)
+
+// DriverCallback defines a callback function.
 // It's used by 'Run' and 'Exec', does some work in parent process
-// after child process is started.
-type StartCallback func(*ProcessConfig, int)
+// when child process passes through PreStart, Start and PostStart phases
+type DriverCallback func(*ProcessConfig, int) error
 
 // Info is driver specific information based on
 // processes registered with the driver
@@ -56,11 +62,11 @@ type ExitStatus struct {
 type Driver interface {
 	// Run executes the process, blocks until the process exits and returns
 	// the exit code. It's the last stage on Docker side for running a container.
-	Run(c *Command, pipes *Pipes, startCallback StartCallback) (ExitStatus, error)
+	Run(c *Command, pipes *Pipes, callbacks []DriverCallback) (ExitStatus, error)
 
 	// Exec executes the process in an existing container, blocks until the
 	// process exits and returns the exit code.
-	Exec(c *Command, processConfig *ProcessConfig, pipes *Pipes, startCallback StartCallback) (int, error)
+	Exec(c *Command, processConfig *ProcessConfig, pipes *Pipes, startCallback DriverCallback) (int, error)
 
 	// Kill sends signals to process in container.
 	Kill(c *Command, sig int) error
@@ -89,6 +95,9 @@ type Driver interface {
 
 	// Stats returns resource stats for a running container
 	Stats(id string) (*ResourceStats, error)
+
+	// SupportsUsernamespace enables the daemon to perform usernamespace related functionality
+	SupportsUserNamespace() bool
 }
 
 // Ipc settings of the container

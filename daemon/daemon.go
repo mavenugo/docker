@@ -820,9 +820,9 @@ func (daemon *Daemon) Shutdown() error {
 		}
 		group.Wait()
 
-		// trigger libnetwork GC only if it's initialized
+		// trigger libnetwork Stop only if it's initialized
 		if daemon.netController != nil {
-			daemon.netController.GC()
+			daemon.netController.Stop()
 		}
 	}
 
@@ -868,8 +868,13 @@ func (daemon *Daemon) unmount(container *Container) error {
 	return nil
 }
 
-func (daemon *Daemon) run(c *Container, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (execdriver.ExitStatus, error) {
-	return daemon.execDriver.Run(c.command, pipes, startCallback)
+func (daemon *Daemon) run(c *Container, pipes *execdriver.Pipes, startCallback execdriver.DriverCallback) (execdriver.ExitStatus, error) {
+	callbacks := make([]execdriver.DriverCallback, 2)
+	callbacks[execdriver.StartFunc] = startCallback
+	callbacks[execdriver.PreStartFunc] = func(processConfig *execdriver.ProcessConfig, pid int) error {
+		return c.setExternalKey(pid)
+	}
+	return daemon.execDriver.Run(c.command, pipes, callbacks)
 }
 
 func (daemon *Daemon) kill(c *Container, sig int) error {

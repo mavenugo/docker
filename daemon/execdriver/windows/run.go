@@ -77,7 +77,7 @@ type containerInit struct {
 const defaultOwner = "docker"
 
 // Run implements the exec driver Driver interface
-func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (execdriver.ExitStatus, error) {
+func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, callbacks []execdriver.DriverCallback) (execdriver.ExitStatus, error) {
 
 	var (
 		term execdriver.Terminal
@@ -290,9 +290,11 @@ func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallba
 	}
 	d.Unlock()
 
-	// Invoke the start callback
-	if startCallback != nil {
-		startCallback(&c.ProcessConfig, int(pid))
+	if len(callbacks) > execdriver.StartFunc {
+		startCallback := callbacks[execdriver.StartFunc]
+		if startCallback != nil {
+			startCallback(&c.ProcessConfig, int(pid))
+		}
 	}
 
 	var exitCode int32
@@ -304,4 +306,10 @@ func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallba
 
 	logrus.Debugf("Exiting Run() exitCode %d id=%s", exitCode, c.ID)
 	return execdriver.ExitStatus{ExitCode: int(exitCode)}, nil
+}
+
+// SupportsUserNamespace implements the exec driver Driver interface.
+// it is not currently implemented in windows driver
+func (d *Driver) SupportsUserNamespace() bool {
+	return false
 }

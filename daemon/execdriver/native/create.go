@@ -18,7 +18,7 @@ import (
 
 // createContainer populates and configures the container type with the
 // data provided by the execdriver.Command
-func (d *Driver) createContainer(c *execdriver.Command) (*configs.Config, error) {
+func (d *Driver) createContainer(c *execdriver.Command, callbacks []execdriver.DriverCallback) (*configs.Config, error) {
 	container := execdriver.InitContainer(c)
 
 	if err := d.createIpc(container, c); err != nil {
@@ -33,7 +33,7 @@ func (d *Driver) createContainer(c *execdriver.Command) (*configs.Config, error)
 		return nil, err
 	}
 
-	if err := d.createNetwork(container, c); err != nil {
+	if err := d.createNetwork(container, c, callbacks); err != nil {
 		return nil, err
 	}
 
@@ -113,7 +113,7 @@ func generateIfaceName() (string, error) {
 	return "", errors.New("Failed to find name for new interface")
 }
 
-func (d *Driver) createNetwork(container *configs.Config, c *execdriver.Command) error {
+func (d *Driver) createNetwork(container *configs.Config, c *execdriver.Command, callbacks []execdriver.DriverCallback) error {
 	if c.Network == nil {
 		return nil
 	}
@@ -135,11 +135,19 @@ func (d *Driver) createNetwork(container *configs.Config, c *execdriver.Command)
 		return nil
 	}
 
-	if c.Network.NamespacePath == "" {
-		return fmt.Errorf("network namespace path is empty")
+	if len(callbacks) > execdriver.PreStartFunc {
+		container.Hooks = &configs.Hooks{
+			Prestart: []configs.Hook{
+				configs.NewFunctionHook(func(s *configs.HookState) error {
+					preStartCallback := callbacks[execdriver.PreStartFunc]
+					if preStartCallback != nil {
+						return preStartCallback(&c.ProcessConfig, s.Pid)
+					}
+					return nil
+				}),
+			},
+		}
 	}
-
-	container.Namespaces.Add(configs.NEWNET, c.Network.NamespacePath)
 	return nil
 }
 

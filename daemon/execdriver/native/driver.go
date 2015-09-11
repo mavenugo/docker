@@ -131,9 +131,9 @@ type execOutput struct {
 
 // Run implements the exec driver Driver interface,
 // it calls libcontainer APIs to run a container.
-func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallback execdriver.StartCallback) (execdriver.ExitStatus, error) {
+func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, callbacks []execdriver.DriverCallback) (execdriver.ExitStatus, error) {
 	// take the Command and populate the libcontainer.Config from it
-	container, err := d.createContainer(c)
+	container, err := d.createContainer(c, callbacks)
 	if err != nil {
 		return execdriver.ExitStatus{ExitCode: -1}, err
 	}
@@ -165,14 +165,17 @@ func (d *Driver) Run(c *execdriver.Command, pipes *execdriver.Pipes, startCallba
 		return execdriver.ExitStatus{ExitCode: -1}, err
 	}
 
-	if startCallback != nil {
-		pid, err := p.Pid()
-		if err != nil {
-			p.Signal(os.Kill)
-			p.Wait()
-			return execdriver.ExitStatus{ExitCode: -1}, err
+	if len(callbacks) > execdriver.StartFunc {
+		startCallback := callbacks[execdriver.StartFunc]
+		if startCallback != nil {
+			pid, err := p.Pid()
+			if err != nil {
+				p.Signal(os.Kill)
+				p.Wait()
+				return execdriver.ExitStatus{ExitCode: -1}, err
+			}
+			startCallback(&c.ProcessConfig, pid)
 		}
-		startCallback(&c.ProcessConfig, pid)
 	}
 
 	oom := notifyOnOOM(cont)
@@ -476,4 +479,9 @@ func setupPipes(container *configs.Config, processConfig *execdriver.ProcessConf
 	}
 	processConfig.Terminal = term
 	return nil
+}
+
+// SupportsUserNamespace implements the exec driver Driver interface.
+func (d *Driver) SupportsUserNamespace() bool {
+	return true
 }
