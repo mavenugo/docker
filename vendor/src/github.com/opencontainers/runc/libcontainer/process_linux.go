@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
 )
 
@@ -202,6 +203,18 @@ func (p *initProcess) start() error {
 			p.manager.Destroy()
 		}
 	}()
+	if p.config.Config.Hooks != nil {
+		s := configs.HookState{
+			// mavenugo : p.container seem to be nil. Need to investigate further
+			// ID:  p.container.id,
+			Pid: p.pid(),
+		}
+		for _, hook := range p.config.Config.Hooks.Prestart {
+			if err := hook.Run(&s); err != nil {
+				return newSystemError(err)
+			}
+		}
+	}
 	if err := p.createNetworkInterfaces(); err != nil {
 		return newSystemError(err)
 	}

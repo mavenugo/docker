@@ -20,7 +20,7 @@ clone git github.com/tchap/go-patricia v2.1.0
 clone git golang.org/x/net 3cffabab72adf04f8e3b01c5baf775361837b5fe https://github.com/golang/net.git
 
 #get libnetwork packages
-clone git github.com/docker/libnetwork 3e31cead05cba8ec20241630d051e6d73765b3a2
+clone git github.com/docker/libnetwork 6175353964906b1279cd3477437b15cca9b1a2e0 https://github.com/mavenugo/libnetwork
 clone git github.com/armon/go-metrics eb0af217e5e9747e41dd5303755356b62d28e3ec
 clone git github.com/hashicorp/go-msgpack 71c2886f5a673a35f909803f38ece5810165097b
 clone git github.com/hashicorp/memberlist 9a1e242e454d2443df330bdd51a436d5a9058fc4
@@ -42,7 +42,8 @@ clone git github.com/endophage/gotuf 9bcdad0308e34a49f38448b8ad436ad8860825ce
 clone git github.com/jfrazelle/go 6e461eb70cb4187b41a84e9a567d7137bdbe0f16
 clone git github.com/agl/ed25519 d2b94fd789ea21d12fac1a4443dd3a3f79cda72c
 
-clone git github.com/opencontainers/runc v0.0.3 # libcontainer
+#clone git github.com/opencontainers/runc v0.0.3 # libcontainer
+clone git github.com/opencontainers/runc 6443afe951f657eb860901d0fdae49bc24b54402 https://github.com/mavenugo/runc
 # libcontainer deps (see src/github.com/docker/libcontainer/update-vendor.sh)
 clone git github.com/coreos/go-systemd v3
 clone git github.com/godbus/dbus v2
