@@ -135,18 +135,22 @@ func (d *Driver) createNetwork(container *configs.Config, c *execdriver.Command,
 		return nil
 	}
 
-	if len(callbacks) > execdriver.PreStartFunc {
-		container.Hooks = &configs.Hooks{
-			Prestart: []configs.Hook{
-				configs.NewFunctionHook(func(s *configs.HookState) error {
-					preStartCallback := callbacks[execdriver.PreStartFunc]
-					if preStartCallback != nil {
-						return preStartCallback(&c.ProcessConfig, s.Pid)
-					}
-					return nil
-				}),
-			},
+	if c.Network.NamespacePath == "" {
+		if len(callbacks) > execdriver.PreStartFunc {
+			container.Hooks = &configs.Hooks{
+				Prestart: []configs.Hook{
+					configs.NewFunctionHook(func(s *configs.HookState) error {
+						preStartCallback := callbacks[execdriver.PreStartFunc]
+						if preStartCallback != nil {
+							return preStartCallback(&c.ProcessConfig, s.Pid)
+						}
+						return nil
+					}),
+				},
+			}
 		}
+	} else {
+		container.Namespaces.Add(configs.NEWNET, c.Network.NamespacePath)
 	}
 	return nil
 }

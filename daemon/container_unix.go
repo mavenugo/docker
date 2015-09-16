@@ -175,7 +175,8 @@ func populateCommand(c *Container, env []string) error {
 	var en *execdriver.Network
 	if !c.Config.NetworkDisabled {
 		en = &execdriver.Network{}
-		if !c.daemon.execDriver.SupportsUserNamespace() {
+		if !c.daemon.execDriver.SupportsUserNamespace() ||
+			c.hostConfig.NetworkMode.IsHost() {
 			en.NamespacePath = c.NetworkSettings.SandboxKey
 		}
 
