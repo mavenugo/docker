@@ -350,6 +350,8 @@ func createRouter(s *Server) *mux.Router {
 			"/containers/{name:.*}/archive":   s.getContainersArchive,
 			"/volumes":                        s.getVolumesList,
 			"/volumes/{name:.*}":              s.getVolumeByName,
+			"/networks":                       s.getNetworksList,
+			"/networks/{id:.*}":               s.getNetwork,
 		},
 		"POST": {
 			"/auth":                         s.postAuth,
@@ -375,6 +377,9 @@ func createRouter(s *Server) *mux.Router {
 			"/exec/{name:.*}/resize":        s.postContainerExecResize,
 			"/containers/{name:.*}/rename":  s.postContainerRename,
 			"/volumes":                      s.postVolumesCreate,
+			"/networks/create":              s.postNetworkCreate,
+			"/networks/{id:.*}/connect":     s.postNetworkConnect,
+			"/networks/{id:.*}/disconnect":  s.postNetworkDisconnect,
 		},
 		"PUT": {
 			"/containers/{name:.*}/archive": s.putContainersArchive,
@@ -383,6 +388,7 @@ func createRouter(s *Server) *mux.Router {
 			"/containers/{name:.*}": s.deleteContainers,
 			"/images/{name:.*}":     s.deleteImages,
 			"/volumes/{name:.*}":    s.deleteVolumes,
+			"/networks/{id:.*}":     s.deleteNetwork,
 		},
 		"OPTIONS": {
 			"": s.optionsHandler,

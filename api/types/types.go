@@ -342,3 +342,39 @@ type VolumeCreateRequest struct {
 	Driver     string            // Driver is the name of the driver that should be used to create the volume
 	DriverOpts map[string]string // DriverOpts holds the driver specific options to use for when creating the volume.
 }
+
+// NetworkResource is the body of the "get network" http response message
+type NetworkResource struct {
+	Name       string                      `json:"name"`
+	ID         string                      `json:"id"`
+	Driver     string                      `json:"driver"`
+	Containers map[string]EndpointResource `json:"containers,omitempty"`
+	Options    map[string]interface{}      `json:"options,omitempty"`
+}
+
+//EndpointResource contains network resources allocated and usd for a container in a network
+type EndpointResource struct {
+	EndpointID  string `json:"endpoint"`
+	MacAddress  string `json:"mac_address,omitempty"`
+	IPv4Address string `json:"ipv4_address,omitempty"`
+	IPv6Address string `json:"ipv6_address,omitempty"`
+}
+
+// NetworkCreate is the expected body of the "create network" http request message
+type NetworkCreate struct {
+	Name           string                 `json:"name"`
+	CheckDuplicate bool                   `json:"check_duplicate"`
+	Driver         string                 `json:"driver"`
+	Options        map[string]interface{} `json:"options"`
+}
+
+// NetworkCreateResponse is the response message sent by the server for network create call
+type NetworkCreateResponse struct {
+	ID      string `json:"id"`
+	Warning string `json:"warning"`
+}
+
+// NetworkConnect represents a list of containers to be connected to a network
+type NetworkConnect struct {
+	Container string `json:"container"`
+}

@@ -572,6 +572,12 @@ func (daemon *Daemon) registerLink(parent, child *Container, alias string) error
 	return nil
 }
 
+// NetworkController represents the libnetwork controller that manages the
+// networking stack
+func (daemon *Daemon) NetworkController() libnetwork.NetworkController {
+	return daemon.netController
+}
+
 // NewDaemon sets up everything for the daemon to be able to service
 // requests from the webserver.
 func NewDaemon(config *Config, registryService *registry.Service) (daemon *Daemon, err error) {
