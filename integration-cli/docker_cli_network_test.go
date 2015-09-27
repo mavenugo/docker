@@ -1,10 +1,11 @@
-// +build experimental
-
 package main
 
 import (
+	"encoding/json"
+	"net"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/go-check/check"
 )
 
@@ -31,6 +32,14 @@ func isNwPresent(c *check.C, name string) bool {
 	return false
 }
 
+func getNwResource(c *check.C, name string) *types.NetworkResource {
+	out, _ := dockerCmd(c, "network", "inspect", name)
+	nr := types.NetworkResource{}
+	err := json.Unmarshal([]byte(out), &nr)
+	c.Assert(err, check.IsNil)
+	return &nr
+}
+
 func (s *DockerSuite) TestDockerNetworkLsDefault(c *check.C) {
 	defaults := []string{"bridge", "host", "none"}
 	for _, nn := range defaults {
@@ -41,6 +50,47 @@ func (s *DockerSuite) TestDockerNetworkLsDefault(c *check.C) {
 func (s *DockerSuite) TestDockerNetworkCreateDelete(c *check.C) {
 	dockerCmd(c, "network", "create", "test")
 	assertNwIsAvailable(c, "test")
+
+	dockerCmd(c, "network", "rm", "test")
+	assertNwNotAvailable(c, "test")
+}
+
+func (s *DockerSuite) TestDockerNetworkConnectDisconnect(c *check.C) {
+	dockerCmd(c, "network", "create", "test")
+	assertNwIsAvailable(c, "test")
+	nr := getNwResource(c, "test")
+
+	c.Assert(nr.Name, check.Equals, "test")
+	c.Assert(nr.Containers, check.IsNil)
+
+	// run a container with no network
+	out, _ := dockerCmd(c, "run", "-d", "--name", "test", "--net=none", "busybox", "top")
+	containerID := strings.TrimSpace(out)
+
+	// connect the container to the test network
+	dockerCmd(c, "network", "connect", "test", containerID)
+
+	// inspect the network to make sure container is connected
+	nr = getNetworkResource(c, nr.ID)
+	c.Assert(nr.Containers, check.Not(check.IsNil))
+	c.Assert(nr.Containers[containerID], check.Not(check.IsNil))
+
+	// check if container IP matches network inspect
+	ip, _, err := net.ParseCIDR(nr.Containers[containerID].IPv4Address)
+	c.Assert(err, check.IsNil)
+	containerIP := findContainerIP(c, "test")
+	c.Assert(ip.String(), check.Equals, containerIP)
+
+	// disconnect container from the network
+	dockerCmd(c, "network", "disconnect", "test", containerID)
+	nr = getNwResource(c, "test")
+	c.Assert(nr.Name, check.Equals, "test")
+	c.Assert(nr.Containers, check.IsNil)
+
+	// check if network connect fails for inactive containers
+	dockerCmd(c, "stop", containerID)
+	_, _, err = dockerCmdWithError("network", "connect", "test", containerID)
+	c.Assert(err, check.Not(check.IsNil))
 
 	dockerCmd(c, "network", "rm", "test")
 	assertNwNotAvailable(c, "test")
