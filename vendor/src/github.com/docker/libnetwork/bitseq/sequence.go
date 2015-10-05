@@ -5,6 +5,7 @@ package bitseq
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -57,12 +58,16 @@ func NewHandle(app string, ds datastore.DataStore, id string, numElements uint32
 		return h, nil
 	}
 
-	// Register for status changes
-	h.watchForChanges()
-
 	// Get the initial status from the ds if present.
 	if err := h.store.GetObject(datastore.Key(h.Key()...), h); err != nil && err != datastore.ErrKeyNotFound {
 		return nil, err
+	}
+
+	// If the handle is not in store, write it.
+	if !h.Exists() {
+		if err := h.writeToStore(); err != nil {
+			return nil, fmt.Errorf("failed to write bitsequence to store: %v", err)
+		}
 	}
 
 	return h, nil
@@ -245,6 +250,12 @@ func (h *Handle) set(ordinal, start, end uint32, any bool, release bool) (uint32
 	)
 
 	for {
+		if h.store != nil {
+			if err := h.store.GetObject(datastore.Key(h.Key()...), h); err != nil && err != datastore.ErrKeyNotFound {
+				return ret, err
+			}
+		}
+
 		h.Lock()
 		// Get position if available
 		if release {
@@ -306,8 +317,23 @@ func (h *Handle) validateOrdinal(ordinal uint32) error {
 }
 
 // Destroy removes from the datastore the data belonging to this handle
-func (h *Handle) Destroy() {
-	h.deleteFromStore()
+func (h *Handle) Destroy() error {
+	for {
+		if err := h.deleteFromStore(); err != nil {
+			if _, ok := err.(types.RetryError); !ok {
+				return fmt.Errorf("internal failure while destroying the sequence: %v", err)
+			}
+			// Fetch latest
+			if err := h.store.GetObject(datastore.Key(h.Key()...), h); err != nil {
+				if err == datastore.ErrKeyNotFound { // already removed
+					return nil
+				}
+				return fmt.Errorf("failed to fetch from store when destroying the sequence: %v", err)
+			}
+			continue
+		}
+		return nil
+	}
 }
 
 // ToByteArray converts this handle's data into a byte array
@@ -365,6 +391,38 @@ func (h *Handle) String() string {
 	defer h.Unlock()
 	return fmt.Sprintf("App: %s, ID: %s, DBIndex: 0x%x, bits: %d, unselected: %d, sequence: %s",
 		h.app, h.id, h.dbIndex, h.bits, h.unselected, h.head.toString())
+}
+
+// MarshalJSON encodes Handle into json message
+func (h *Handle) MarshalJSON() ([]byte, error) {
+	m := map[string]interface{}{
+		"id": h.id,
+	}
+
+	b, err := h.ToByteArray()
+	if err != nil {
+		return nil, err
+	}
+	m["sequence"] = b
+	return json.Marshal(m)
+}
+
+// UnmarshalJSON decodes json message into Handle
+func (h *Handle) UnmarshalJSON(data []byte) error {
+	var (
+		m   map[string]interface{}
+		b   []byte
+		err error
+	)
+	if err = json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	h.id = m["id"].(string)
+	bi, _ := json.Marshal(m["sequence"])
+	if err := json.Unmarshal(bi, &b); err != nil {
+		return err
+	}
+	return h.FromByteArray(b)
 }
 
 // getFirstAvailable looks for the first unset bit in passed mask starting from start
