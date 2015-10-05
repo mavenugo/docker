@@ -95,7 +95,7 @@ func (n *networkRouter) postNetworkCreate(ctx context.Context, w http.ResponseWr
 		warning = fmt.Sprintf("Network with name %s (id : %s) already exists", nw.Name(), nw.ID())
 	}
 
-	nw, err = n.daemon.CreateNetwork(create.Name, create.Driver, create.Options)
+	nw, err = n.daemon.CreateNetwork(create.Name, create.Driver, create.Labels)
 	if err != nil {
 		return err
 	}
@@ -204,12 +204,12 @@ func buildEndpointResource(e libnetwork.Endpoint) types.EndpointResource {
 		if mac := iface.MacAddress(); mac != nil {
 			er.MacAddress = mac.String()
 		}
-		if ip := iface.Address(); len(ip.IP) > 0 {
-			er.IPv4Address = (&ip).String()
+		if ip := iface.Address(); ip != nil && len(ip.IP) > 0 {
+			er.IPv4Address = ip.String()
 		}
 
-		if ipv6 := iface.AddressIPv6(); len(ipv6.IP) > 0 {
-			er.IPv6Address = (&ipv6).String()
+		if ipv6 := iface.AddressIPv6(); ipv6 != nil && len(ipv6.IP) > 0 {
+			er.IPv6Address = ipv6.String()
 		}
 	}
 	return er

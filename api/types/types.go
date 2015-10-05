@@ -315,7 +315,7 @@ type NetworkResource struct {
 	ID         string                      `json:"id"`
 	Driver     string                      `json:"driver"`
 	Containers map[string]EndpointResource `json:"containers"`
-	Options    map[string]interface{}      `json:"options,omitempty"`
+	Labels     []string                    `json:"labels"`
 }
 
 //EndpointResource contains network resources allocated and usd for a container in a network
@@ -328,10 +328,10 @@ type EndpointResource struct {
 
 // NetworkCreate is the expected body of the "create network" http request message
 type NetworkCreate struct {
-	Name           string                 `json:"name"`
-	CheckDuplicate bool                   `json:"check_duplicate"`
-	Driver         string                 `json:"driver"`
-	Options        map[string]interface{} `json:"options"`
+	Name           string   `json:"name"`
+	CheckDuplicate bool     `json:"check_duplicate"`
+	Driver         string   `json:"driver"`
+	Labels         []string `json:"labels"`
 }
 
 // NetworkCreateResponse is the response message sent by the server for network create call
