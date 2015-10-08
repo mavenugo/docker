@@ -5,7 +5,7 @@ description = "The daemon command description and usage"
 keywords = ["container, daemon, runtime"]
 [menu.main]
 parent = "smn_cli"
-weight=1
+weight = -1
 +++
 <![end-metadata]-->
 
@@ -24,6 +24,7 @@ weight=1
       --default-gateway-v6=""                Container default gateway IPv6 address
       --cluster-store=""                     URL of the distributed storage backend
       --cluster-advertise=""                 Address of the daemon instance to advertise
+      --cluster-store-opt=map[]              Set cluster options
       --dns=[]                               DNS server to use
       --dns-opt=[]                           DNS options to use
       --dns-search=[]                        DNS search domains to use
@@ -537,6 +538,20 @@ please check the [run](run.md) reference.
 daemon instance should use when advertising itself to the cluster. The daemon
 should be reachable by remote hosts on this 'host:port' combination.
 
+The daemon uses [libkv](https://github.com/docker/libkv/) to advertise
+the node within the cluster.  Some Key/Value backends support mutual
+TLS, and the client TLS settings used by the daemon can be configured
+using the `--cluster-store-opt` flag, specifying the paths to PEM encoded
+files. For example:
+
+```bash
+    --cluster-advertise 192.168.1.2:2376 \
+    --cluster-store etcd://192.168.1.2:2379 \
+    --cluster-store-opt kv.cacertfile=/path/to/ca.pem \
+    --cluster-store-opt kv.certfile=/path/to/cert.pem \
+    --cluster-store-opt kv.keyfile=/path/to/key.pem
+```
+
 ## Miscellaneous options
 
 IP masquerading uses address translation to allow containers without a public
@@ -551,5 +566,3 @@ set like this:
     # or
     export DOCKER_TMPDIR=/mnt/disk2/tmp
     /usr/local/bin/docker daemon -D -g /var/lib/docker -H unix:// > /var/lib/docker-machine/docker.log 2>&1
-
-
