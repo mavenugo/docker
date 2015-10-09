@@ -36,7 +36,7 @@ clone git github.com/hashicorp/consul v0.5.2
 clone git github.com/boltdb/bolt v1.0
 
 # get graph and distribution packages
-clone git github.com/docker/distribution ec87e9b6971d831f0eff752ddb54fb64693e51cd # docker/1.8 branch
+clone git github.com/docker/distribution 20c4b7a1805a52753dfd593ee1cc35558722a0ce # docker/1.9 branch
 clone git github.com/vbatts/tar-split v0.9.10
 
 clone git github.com/docker/notary ac05822d7d71ef077df3fc24f506672282a1feea
@@ -44,7 +44,7 @@ clone git github.com/endophage/gotuf 9bcdad0308e34a49f38448b8ad436ad8860825ce
 clone git github.com/jfrazelle/go 6e461eb70cb4187b41a84e9a567d7137bdbe0f16
 clone git github.com/agl/ed25519 d2b94fd789ea21d12fac1a4443dd3a3f79cda72c
 
-clone git github.com/opencontainers/runc 902c012e85cdae6bb68d8c7a0df69a42f818ce96 # libcontainer
+clone git github.com/opencontainers/runc f152edcb1ca7877dd6e3febddd1b03ad4335e7bb # libcontainer
 # libcontainer deps (see src/github.com/opencontainers/runc/Godeps/Godeps.json)
 clone git github.com/coreos/go-systemd v3
 clone git github.com/godbus/dbus v2
