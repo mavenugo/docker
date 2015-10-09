@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/docker/docker/api/types"
 	Cli "github.com/docker/docker/cli"
+	"github.com/docker/docker/daemon/network"
+	"github.com/docker/docker/opts"
 	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/docker/docker/pkg/stringid"
+	"github.com/docker/docker/runconfig"
 )
 
 // CmdNetwork is the parent subcommand for all network commands
@@ -29,15 +34,40 @@ func (cli *DockerCli) CmdNetwork(args ...string) error {
 // Usage: docker network create [OPTIONS] <NETWORK-NAME>
 func (cli *DockerCli) CmdNetworkCreate(args ...string) error {
 	cmd := Cli.Subcmd("network create", []string{"NETWORK-NAME"}, "Creates a new network with a name specified by the user", false)
-	flDriver := cmd.String([]string{"d", "-driver"}, "", "Driver to manage the Network")
+	flDriver := cmd.String([]string{"d", "-driver"}, "bridge", "Driver to manage the Network")
+	flLabels := opts.NewListOpts(nil)
+
+	flIpamDriver := cmd.String([]string{"-ipam-driver"}, "default", "IP Address Management Driver")
+	flIpamSubnet := opts.NewListOpts(nil)
+	flIpamIPRange := opts.NewListOpts(nil)
+	flIpamGateway := opts.NewListOpts(nil)
+	flIpamAux := opts.NewListOpts(nil)
+
+	cmd.Var(&flIpamSubnet, []string{"-subnet"}, "Subnet in CIDR format that represents a network segment")
+	cmd.Var(&flIpamIPRange, []string{"-ip-range"}, "allocate container ip from a sub-range")
+	cmd.Var(&flIpamGateway, []string{"-gateway"}, "ipv4 or ipv6 Gateway for the master subnet")
+	cmd.Var(&flIpamAux, []string{"-aux-address"}, "Auxilary ipv4 or ipv6 addresses used by Network driver")
+	cmd.Var(&flLabels, []string{"l", "-label"}, "network metadata of the form Key=Value")
+
 	cmd.Require(flag.Exact, 1)
 	err := cmd.ParseFlags(args, true)
 	if err != nil {
 		return err
 	}
 
+	ipamdata, err := consolidateIpam(flIpamSubnet.GetAll(), flIpamIPRange.GetAll(), flIpamGateway.GetAll(), flIpamAux.GetAll())
+	if err != nil {
+		return err
+	}
 	// Construct network create request body
-	nc := types.NetworkCreate{Name: cmd.Arg(0), Driver: *flDriver, CheckDuplicate: true}
+	nc := types.NetworkCreate{
+		Name:           cmd.Arg(0),
+		Driver:         *flDriver,
+		IpamDriver:     *flIpamDriver,
+		Ipam:           ipamdata,
+		Labels:         runconfig.ConvertKVStringsToMap(flLabels.GetAll()),
+		CheckDuplicate: true,
+	}
 	obj, _, err := readBody(cli.call("POST", "/networks/create", nc, nil))
 	if err != nil {
 		return err
@@ -104,21 +134,19 @@ func (cli *DockerCli) CmdNetworkDisconnect(args ...string) error {
 //
 // Usage: docker network ls [OPTIONS]
 func (cli *DockerCli) CmdNetworkLs(args ...string) error {
-	cmd := Cli.Subcmd("network ls", []string{""}, "Lists all the networks created by the user", false)
+	cmd := Cli.Subcmd("network ls", nil, "Lists networks", true)
 	quiet := cmd.Bool([]string{"q", "-quiet"}, false, "Only display numeric IDs")
-	noTrunc := cmd.Bool([]string{"", "-no-trunc"}, false, "Do not truncate the output")
-	nLatest := cmd.Bool([]string{"l", "-latest"}, false, "Show the latest network created")
-	last := cmd.Int([]string{"n"}, -1, "Show n last created networks")
+	noTrunc := cmd.Bool([]string{"-no-trunc"}, false, "Do not truncate the output")
+
+	cmd.Require(flag.Exact, 0)
 	err := cmd.ParseFlags(args, true)
+
 	if err != nil {
 		return err
 	}
 	obj, _, err := readBody(cli.call("GET", "/networks", nil, nil))
 	if err != nil {
 		return err
-	}
-	if *last == -1 && *nLatest {
-		*last = 1
 	}
 
 	var networkResources []types.NetworkResource
@@ -184,6 +212,125 @@ func (cli *DockerCli) CmdNetworkInspect(args ...string) error {
 		return err
 	}
 	return nil
+}
+
+// Consolidates the ipam configuration as a group from differnt related configurations
+// user can configure network with multiple non-overlapping subnets and hence it is
+// possible to corelate the various related parameters and consolidate them.
+// consoidateIpam consolidates subnets, ip-ranges, gateways and auxilary addresses into
+// structured ipam data.
+func consolidateIpam(subnets, ranges, gateways, auxaddrs []string) ([]network.IpamData, error) {
+	if len(subnets) < len(ranges) || len(subnets) < len(gateways) || len(subnets) < len(auxaddrs) {
+		return nil, fmt.Errorf("every ip-range or gateway or auxilary-address must have a corresponding subnet")
+	}
+	iData := map[string]*network.IpamData{}
+
+	// Populate subnets into consolidation map
+	for _, s := range subnets {
+		if _, ok := iData[s]; !ok {
+			iData[s] = &network.IpamData{Subnet: s, AuxAddress: map[string]string{}}
+		} else {
+			return nil, fmt.Errorf("cannot configure multiple subnets with the same value %s", s)
+		}
+	}
+
+	// Validate and add valid ip ranges
+	for _, r := range ranges {
+		match := false
+		for _, s := range subnets {
+			ok, err := subnetMatches(s, r)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			if iData[s].IPRange != "" {
+				return nil, fmt.Errorf("cannot configure multiple ranges (%s, %s) on the same subnet (%s)", r, iData[s].IPRange, s)
+			}
+			d := iData[s]
+			d.IPRange = r
+			match = true
+		}
+		if !match {
+			return nil, fmt.Errorf("no matching subnet for range %s", r)
+		}
+	}
+
+	// Validate and add valid gateways
+	for _, g := range gateways {
+		match := false
+		for _, s := range subnets {
+			ok, err := subnetMatches(s, g)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			if iData[s].Gateway != "" {
+				return nil, fmt.Errorf("cannot configure multiple gateways (%s, %s) for the same subnet (%s)", g, iData[s].Gateway, s)
+			}
+			d := iData[s]
+			d.Gateway = g
+			match = true
+		}
+		if !match {
+			return nil, fmt.Errorf("no matching subnet for gateway %s", g)
+		}
+	}
+
+	// Validate and add aux-addresses
+	for _, aa := range auxaddrs {
+		match := false
+		for _, s := range subnets {
+			a := strings.Split(aa, "=")
+			if len(a) != 2 {
+				return nil, fmt.Errorf("aux-address must be defined in the form Key=Value")
+			}
+
+			ok, err := subnetMatches(s, a[1])
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			iData[s].AuxAddress[a[0]] = a[1]
+			match = true
+		}
+		if !match {
+			return nil, fmt.Errorf("no matching subnet for aux-address %s", aa)
+		}
+	}
+
+	idl := []network.IpamData{}
+	for _, v := range iData {
+		idl = append(idl, *v)
+	}
+	return idl, nil
+}
+
+func subnetMatches(subnet, data string) (bool, error) {
+	var (
+		ip net.IP
+	)
+
+	_, s, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return false, fmt.Errorf("Invalid subnet %s : %v", s, err)
+	}
+
+	if strings.Contains(data, "/") {
+		ip, _, err = net.ParseCIDR(data)
+		if err != nil {
+			return false, fmt.Errorf("Invalid cidr %s : %v", data, err)
+		}
+	} else {
+		ip = net.ParseIP(data)
+	}
+
+	return s.Contains(ip), nil
 }
 
 func networkUsage() string {

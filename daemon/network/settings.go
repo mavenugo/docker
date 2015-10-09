@@ -8,6 +8,14 @@ type Address struct {
 	PrefixLen int
 }
 
+// IPAM settings
+type IpamData struct {
+	Subnet     string            `json:"subnet"`
+	IPRange    string            `json:"ip_range"`
+	Gateway    string            `json:"gateway"`
+	AuxAddress map[string]string `json:"auxilary_address"`
+}
+
 // Settings stores configuration details about the daemon network config
 // TODO Windows. Many of these fields can be factored out.,
 type Settings struct {
