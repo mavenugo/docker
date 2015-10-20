@@ -365,7 +365,7 @@ func (daemon *Daemon) mergeAndVerifyConfig(config *runconfig.Config, img *image.
 	return nil
 }
 
-func (daemon *Daemon) generateIDAndName(ctx context.Context, name string) (string, string, error) {
+func (daemon *Daemon) generateIDAndName(ctx context.Context, name string) (string, string, bool, error) {
 	var (
 		err error
 		id  = stringid.GenerateNonCryptoID()
@@ -373,16 +373,16 @@ func (daemon *Daemon) generateIDAndName(ctx context.Context, name string) (strin
 
 	if name == "" {
 		if name, err = daemon.generateNewName(id); err != nil {
-			return "", "", err
+			return "", "", false, err
 		}
-		return id, name, nil
+		return id, name, true, nil
 	}
 
 	if name, err = daemon.reserveName(ctx, id, name); err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
 
-	return id, name, nil
+	return id, name, false, nil
 }
 
 func (daemon *Daemon) reserveName(ctx context.Context, id, name string) (string, error) {
@@ -471,10 +471,11 @@ func (daemon *Daemon) getEntrypointAndArgs(configEntrypoint *stringutils.StrSlic
 
 func (daemon *Daemon) newContainer(ctx context.Context, name string, config *runconfig.Config, imgID string) (*Container, error) {
 	var (
-		id  string
-		err error
+		id        string
+		err       error
+		generated bool
 	)
-	id, name, err = daemon.generateIDAndName(ctx, name)
+	id, name, generated, err = daemon.generateIDAndName(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -491,6 +492,7 @@ func (daemon *Daemon) newContainer(ctx context.Context, name string, config *run
 	base.ImageID = imgID
 	base.NetworkSettings = &network.Settings{}
 	base.Name = name
+	base.Generated = generated
 	base.Driver = daemon.driver.String()
 	base.ExecDriver = daemon.execDriver.Name()
 
