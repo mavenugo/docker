@@ -890,4 +890,7 @@ if there are conflicts, but it won't stop execution.
 The list of currently supported options that can be reconfigured is this:
 
 - `debug`: it changes the daemon to debug mode when set to true.
+- `cluster-store`: it reloads the discovery store with the new address.
+- `cluster-store-opts`: it uses the new options to reload the discovery store.
+- `cluster-advertise`: it modifies the address advertised after reloading.
 - `labels`: it replaces the daemon labels with a new set of labels.
