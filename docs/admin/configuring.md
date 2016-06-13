@@ -278,3 +278,15 @@ be viewed using `journalctl -u docker`
     May 06 00:22:06 localhost.localdomain docker[2495]: time="2015-05-06T00:22:06Z" level="info" msg="-job acceptconnections() = OK (0)"
 
 _Note: Using and configuring journal is an advanced topic and is beyond the scope of this article._
+
+
+### Daemonless Containers
+
+Starting with Docker 1.12 containers can run without Docker or containerd running.  This allows the 
+Docker daemon to exit, be upgraded, or recover from a crash without affecting running containers 
+on the system.  To enable this functionality you need to add the `--live-restore` flag when
+launching `dockerd`.  This will ensure that Docker does not kill containers on graceful shutdown or
+on restart leaving the containers running.
+
+While the Docker daemon is down logging will still be captured, however, it will be capped at 64kb before
+the buffer fill up, blocking the process.  Docker will need to be restarted to flush these buffers.
