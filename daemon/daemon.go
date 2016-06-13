@@ -141,6 +141,7 @@ func (daemon *Daemon) restore() error {
 
 	var migrateLegacyLinks bool
 	restartContainers := make(map[*container.Container]chan struct{})
+	activeSandboxes := make(map[string]interface{})
 	for _, c := range containers {
 		if err := daemon.registerName(c); err != nil {
 			logrus.Errorf("Failed to register container %s: %s", c.ID, err)
@@ -163,6 +164,16 @@ func (daemon *Daemon) restore() error {
 					logrus.Errorf("Failed to restore with containerd: %q", err)
 					return
 				}
+				if !c.HostConfig.NetworkMode.IsContainer() {
+					options, err := daemon.buildSandboxOptions(c)
+					if err != nil {
+						logrus.Warnf("Failed build sandbox option to restore container %s: %v", c.ID, err)
+					}
+					mapLock.Lock()
+					activeSandboxes[c.NetworkSettings.SandboxID] = options
+					mapLock.Unlock()
+				}
+
 			}
 			// fixme: only if not running
 			// get list of containers we need to restart
@@ -194,6 +205,10 @@ func (daemon *Daemon) restore() error {
 		}(c)
 	}
 	wg.Wait()
+	daemon.netController, err = daemon.initNetworkController(daemon.configStore, activeSandboxes)
+	if err != nil {
+		return fmt.Errorf("Error initializing network controller: %v", err)
+	}
 
 	// migrate any legacy links from sqlite
 	linkdbFile := filepath.Join(daemon.root, "linkgraph.db")
@@ -513,11 +528,6 @@ func NewDaemon(config *Config, registryService registry.Service, containerdRemot
 	// initialized, the daemon is registered and we can store the discovery backend as its read-only
 	if err := d.initDiscovery(config); err != nil {
 		return nil, err
-	}
-
-	d.netController, err = d.initNetworkController(config)
-	if err != nil {
-		return nil, fmt.Errorf("Error initializing network controller: %v", err)
 	}
 
 	sysInfo := sysinfo.New(false)
@@ -906,7 +916,7 @@ func (daemon *Daemon) reloadClusterDiscovery(config *Config) error {
 	if daemon.netController == nil {
 		return nil
 	}
-	netOptions, err := daemon.networkOptions(daemon.configStore)
+	netOptions, err := daemon.networkOptions(daemon.configStore, nil)
 	if err != nil {
 		logrus.Warnf("Failed to reload configuration with network controller: %v", err)
 		return nil
@@ -923,7 +933,7 @@ func isBridgeNetworkDisabled(config *Config) bool {
 	return config.bridgeConfig.Iface == disableNetworkBridge
 }
 
-func (daemon *Daemon) networkOptions(dconfig *Config) ([]nwconfig.Option, error) {
+func (daemon *Daemon) networkOptions(dconfig *Config, activeSandboxes map[string]interface{}) ([]nwconfig.Option, error) {
 	options := []nwconfig.Option{}
 	if dconfig == nil {
 		return options, nil
@@ -958,6 +968,11 @@ func (daemon *Daemon) networkOptions(dconfig *Config) ([]nwconfig.Option, error)
 
 	options = append(options, nwconfig.OptionLabels(dconfig.Labels))
 	options = append(options, driverOptions(dconfig)...)
+
+	if len(activeSandboxes) != 0 {
+		options = append(options, nwconfig.OptionActiveSandboxes(activeSandboxes))
+	}
+
 	return options, nil
 }
 
