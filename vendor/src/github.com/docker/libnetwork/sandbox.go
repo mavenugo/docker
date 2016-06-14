@@ -700,6 +700,48 @@ func (sb *sandbox) releaseOSSbox() {
 	osSbox.Destroy()
 }
 
+func (sb *sandbox) restoreOslSandbox() error {
+	var routes []*types.StaticRoute
+
+	// restore osl sandbox
+	Ifaces := make(map[string][]osl.IfaceOption)
+	ifaceOptions := make([][]osl.IfaceOption, len(sb.endpoints))
+	for j, ep := range sb.endpoints {
+		ep.Lock()
+		joinInfo := ep.joinInfo
+		i := ep.iface
+		ep.Unlock()
+		ifaceOptions[j] = append(ifaceOptions[j], sb.osSbox.InterfaceOptions().Address(i.addr), sb.osSbox.InterfaceOptions().Routes(i.routes))
+		if i.addrv6 != nil && i.addrv6.IP.To16() != nil {
+			ifaceOptions[j] = append(ifaceOptions[j], sb.osSbox.InterfaceOptions().AddressIPv6(i.addrv6))
+		}
+		if i.mac != nil {
+			ifaceOptions[j] = append(ifaceOptions[j], sb.osSbox.InterfaceOptions().MacAddress(i.mac))
+		}
+		Ifaces[fmt.Sprintf("%s+%s", i.srcName, i.dstPrefix)] = ifaceOptions[j]
+		if joinInfo != nil {
+			for _, r := range joinInfo.StaticRoutes {
+				routes = append(routes, r)
+			}
+		}
+		if ep.needResolver() {
+			sb.startResolver()
+		}
+	}
+
+	gwep := sb.getGatewayEndpoint()
+	if gwep == nil {
+		return nil
+	}
+
+	// restore osl sandbox
+	err := sb.osSbox.Restore(Ifaces, routes, gwep.joinInfo.gw, gwep.joinInfo.gw6)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (sb *sandbox) populateNetworkResources(ep *endpoint) error {
 	sb.Lock()
 	if sb.osSbox == nil {

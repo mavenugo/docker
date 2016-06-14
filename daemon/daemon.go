@@ -984,7 +984,7 @@ func (daemon *Daemon) networkOptions(dconfig *Config, activeSandboxes map[string
 	options = append(options, nwconfig.OptionLabels(dconfig.Labels))
 	options = append(options, driverOptions(dconfig)...)
 
-	if len(activeSandboxes) != 0 {
+	if daemon.configStore.LiveRestore && len(activeSandboxes) != 0 {
 		options = append(options, nwconfig.OptionActiveSandboxes(activeSandboxes))
 	}
 
