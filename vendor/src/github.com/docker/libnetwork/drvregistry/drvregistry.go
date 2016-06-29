@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/driverapi"
 	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/libnetwork/types"
@@ -123,6 +124,7 @@ func (r *DrvRegistry) Driver(name string) (driverapi.Driver, *driverapi.Capabili
 	r.Lock()
 	defer r.Unlock()
 
+	logrus.Infof("DRVREGISTRY MAP %p %v", r, r.drivers)
 	d, ok := r.drivers[name]
 	if !ok {
 		return nil, nil
@@ -173,6 +175,7 @@ func (r *DrvRegistry) initIPAMs(lDs, gDs interface{}) error {
 
 // RegisterDriver registers the network driver when it gets discovered.
 func (r *DrvRegistry) RegisterDriver(ntype string, driver driverapi.Driver, capability driverapi.Capability) error {
+	logrus.Infof("DRVREGISTRY RD : %s %v", ntype, capability)
 	if strings.TrimSpace(ntype) == "" {
 		return fmt.Errorf("network type string cannot be empty")
 	}
@@ -186,6 +189,7 @@ func (r *DrvRegistry) RegisterDriver(ntype string, driver driverapi.Driver, capa
 	}
 
 	if r.dfn != nil {
+		logrus.Infof("DRVREGISTRY DFN")
 		if err := r.dfn(ntype, driver, capability); err != nil {
 			return err
 		}
@@ -193,10 +197,12 @@ func (r *DrvRegistry) RegisterDriver(ntype string, driver driverapi.Driver, capa
 
 	dData := &driverData{driver, capability}
 
+	logrus.Infof("adding %s to drivers list in %p", ntype, r)
 	r.Lock()
 	r.drivers[ntype] = dData
 	r.Unlock()
 
+	logrus.Infof("DRVREGISTRY Drivers = %v", r.drivers)
 	return nil
 }
 

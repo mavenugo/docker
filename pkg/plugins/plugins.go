@@ -43,7 +43,7 @@ type plugins struct {
 
 var (
 	storage          = plugins{plugins: make(map[string]*Plugin)}
-	extpointHandlers = make(map[string]func(string, *Client))
+	extpointHandlers = make(map[string][]func(string, *Client))
 )
 
 // Manifest lists what a plugin implements.
@@ -95,6 +95,7 @@ func NewLocalPlugin(name, addr string) *Plugin {
 }
 
 func (p *Plugin) activate() error {
+	logrus.Infof("Plugin ACTIVATE %v", p.Name())
 	p.activateWait.L.Lock()
 	if p.activated {
 		p.activateWait.L.Unlock()
@@ -123,12 +124,18 @@ func (p *Plugin) activateWithLock() error {
 
 	p.Manifest = m
 
+	logrus.Infof("Plugin Manifest : %v", m.Implements)
+
 	for _, iface := range m.Implements {
-		handler, handled := extpointHandlers[iface]
+		handlers, handled := extpointHandlers[iface]
 		if !handled {
+			logrus.Infof("NOT HANDLED")
 			continue
 		}
-		handler(p.name, p.client)
+		logrus.Infof("HANDLER CALLED")
+		for _, handler := range handlers {
+			handler(p.name, p.client)
+		}
 	}
 	return nil
 }
@@ -221,7 +228,17 @@ func Get(name, imp string) (*Plugin, error) {
 
 // Handle adds the specified function to the extpointHandlers.
 func Handle(iface string, fn func(string, *Client)) {
-	extpointHandlers[iface] = fn
+	handlers, ok := extpointHandlers[iface]
+	if !ok {
+		handlers = []func(string, *Client){fn}
+	}
+
+	handlers = append(handlers, fn)
+	extpointHandlers[iface] = handlers
+	pa, _ := GetAll(iface)
+	for _, p := range pa {
+		p.activated = false
+	}
 }
 
 // GetAll returns all the plugins for the specified implementation

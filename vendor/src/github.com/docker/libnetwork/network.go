@@ -671,6 +671,7 @@ func (n *network) resolveDriver(name string, load bool) (driverapi.Driver, *driv
 				return nil, nil, err
 			}
 
+			log.Infof("NETWORK DRVREGISTRY %p", c.drvRegistry)
 			d, cap = c.drvRegistry.Driver(name)
 			if d == nil {
 				return nil, nil, fmt.Errorf("could not resolve driver %s in registry", name)

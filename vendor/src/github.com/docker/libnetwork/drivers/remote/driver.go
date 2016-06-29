@@ -31,6 +31,7 @@ func newDriver(name string, client *plugins.Client) driverapi.Driver {
 func Init(dc driverapi.DriverCallback, config map[string]interface{}) error {
 	plugins.Handle(driverapi.NetworkPluginEndpointType, func(name string, client *plugins.Client) {
 		// negotiate driver capability with client
+		log.Infof("REMOTE PLUGIN CALLBACK : %s", name)
 		d := newDriver(name, client)
 		c, err := d.(*driver).getCapabilities()
 		if err != nil {
@@ -83,12 +84,21 @@ func (d *driver) call(methodName string, arg interface{}, retVal maybeError) err
 	return nil
 }
 
-func (d *driver) NetworkAllocate(id string, option map[string]string, ipV4Data, ipV6Data []driverapi.IPAMData) (map[string]string, error) {
-	return nil, types.NotImplementedErrorf("not implemented")
+func (d *driver) NetworkAllocate(id string, options map[string]string, ipV4Data, ipV6Data []driverapi.IPAMData) (map[string]string, error) {
+	create := &api.AllocateNetworkRequest{
+		NetworkID: id,
+		Options:   options,
+		IPv4Data:  ipV4Data,
+		IPv6Data:  ipV6Data,
+	}
+	retVal := api.AllocateNetworkResponse{}
+	err := d.call("AllocateNetwork", create, &retVal)
+	return retVal.Options, err
 }
 
 func (d *driver) NetworkFree(id string) error {
-	return types.NotImplementedErrorf("not implemented")
+	fr := &api.FreeNetworkRequest{NetworkID: id}
+	return d.call("FreeNetwork", fr, &api.FreeNetworkResponse{})
 }
 
 func (d *driver) EventNotify(etype driverapi.EventType, nid, tableName, key string, value []byte) {
