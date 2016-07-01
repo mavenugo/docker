@@ -34,6 +34,9 @@ var autoAcceptPolicy = swarm.AcceptancePolicy{
 func (d *SwarmDaemon) Init(req swarm.InitRequest) error {
 	if req.ListenAddr == "" {
 		req.ListenAddr = d.listenAddr
+		if strings.HasPrefix(req.ListenAddr, "0.0.0.0") {
+			req.ListenAddr = "lo" + strings.TrimPrefix(req.ListenAddr, "0.0.0.0")
+		}
 	}
 	status, out, err := d.SockRequest("POST", "/swarm/init", req)
 	if status != http.StatusOK {

@@ -89,7 +89,7 @@ func (s *DockerSwarmSuite) TestSwarmInit(c *check.C) {
 		return sw[0].Spec
 	}
 
-	out, err := d.Cmd("swarm", "init", "--cert-expiry", "30h", "--dispatcher-heartbeat", "11s", "--auto-accept", "manager", "--auto-accept", "worker", "--secret", "foo")
+	out, err := d.Cmd("swarm", "init", "--listen-addr", "lo", "--cert-expiry", "30h", "--dispatcher-heartbeat", "11s", "--auto-accept", "manager", "--auto-accept", "worker", "--secret", "foo")
 	c.Assert(err, checker.IsNil, check.Commentf("out: %v", out))
 
 	spec := getSpec()
@@ -106,7 +106,7 @@ func (s *DockerSwarmSuite) TestSwarmInit(c *check.C) {
 
 	c.Assert(d.Leave(true), checker.IsNil)
 
-	out, err = d.Cmd("swarm", "init", "--auto-accept", "none", "--secret", "")
+	out, err = d.Cmd("swarm", "init", "--listen-addr", "lo", "--auto-accept", "none", "--secret", "")
 	c.Assert(err, checker.IsNil, check.Commentf("out: %v", out))
 
 	spec = getSpec()
@@ -129,7 +129,7 @@ func (s *DockerSwarmSuite) TestSwarmInitIPv6(c *check.C) {
 	c.Assert(err, checker.IsNil, check.Commentf("out: %v", out))
 
 	d2 := s.AddDaemon(c, false, false)
-	out, err = d2.Cmd("swarm", "join", "::1")
+	out, err = d2.Cmd("swarm", "join", "--listen-addr", "lo", "::1")
 	c.Assert(err, checker.IsNil, check.Commentf("out: %v", out))
 
 	out, err = d2.Cmd("info")
