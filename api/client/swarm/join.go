@@ -13,9 +13,11 @@ import (
 type joinOptions struct {
 	remote     string
 	listenAddr NodeAddrOption
-	manager    bool
-	secret     string
-	CACertHash string
+	// Not a NodeAddrOption because it has no default port.
+	advertiseAddr string
+	manager       bool
+	secret        string
+	CACertHash    string
 }
 
 func newJoinCommand(dockerCli *client.DockerCli) *cobra.Command {
@@ -35,6 +37,7 @@ func newJoinCommand(dockerCli *client.DockerCli) *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.Var(&opts.listenAddr, flagListenAddr, "Listen address")
+	flags.StringVar(&opts.advertiseAddr, flagAdvertiseAddr, "", "Advertised address (format: <ip|hostname|interface>[:port])")
 	flags.BoolVar(&opts.manager, "manager", false, "Try joining as a manager.")
 	flags.StringVar(&opts.secret, flagSecret, "", "Secret for node acceptance")
 	flags.StringVar(&opts.CACertHash, "ca-hash", "", "Hash of the Root Certificate Authority certificate used for trusted join")
@@ -46,11 +49,12 @@ func runJoin(dockerCli *client.DockerCli, opts joinOptions) error {
 	ctx := context.Background()
 
 	req := swarm.JoinRequest{
-		Manager:     opts.manager,
-		Secret:      opts.secret,
-		ListenAddr:  opts.listenAddr.String(),
-		RemoteAddrs: []string{opts.remote},
-		CACertHash:  opts.CACertHash,
+		Manager:       opts.manager,
+		Secret:        opts.secret,
+		ListenAddr:    opts.listenAddr.String(),
+		AdvertiseAddr: opts.advertiseAddr,
+		RemoteAddrs:   []string{opts.remote},
+		CACertHash:    opts.CACertHash,
 	}
 	err := client.SwarmJoin(ctx, req)
 	if err != nil {
