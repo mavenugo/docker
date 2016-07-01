@@ -1,7 +1,9 @@
 package swarm
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"golang.org/x/net/context"
 
@@ -43,7 +45,7 @@ func newInitCommand(dockerCli *client.DockerCli) *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	flags.Var(&opts.listenAddr, "listen-addr", "Listen address")
+	flags.Var(&opts.listenAddr, flagListenAddr, "Listen address (format: <ip|hostname|interface>[:port])")
 	flags.BoolVar(&opts.forceNewCluster, "force-new-cluster", false, "Force create a new cluster from current state.")
 	addSwarmFlags(flags, &opts.swarmOptions)
 	return cmd
@@ -67,6 +69,9 @@ func runInit(dockerCli *client.DockerCli, flags *pflag.FlagSet, opts initOptions
 
 	nodeID, err := client.SwarmInit(ctx, req)
 	if err != nil {
+		if strings.Contains(err.Error(), "could not choose a listening IP address") || strings.Contains(err.Error(), "could not find the system's IP address") {
+			return errors.New(err.Error() + " - specify one with --listen-addr")
+		}
 		return err
 	}
 

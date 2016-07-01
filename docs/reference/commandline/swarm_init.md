@@ -23,7 +23,7 @@ Options:
       --external-ca value               Specifications of one or more certificate signing endpoints
       --force-new-cluster               Force create a new cluster from current state.
       --help                            Print usage
-      --listen-addr value               Listen address (default 0.0.0.0:2377)
+      --listen-addr value               Listen address (format: <ip|hostname|interface>[:port])
       --secret string                   Set secret value needed to accept nodes into cluster
       --task-history-limit int          Task history retention limit (default 10)
 ```
@@ -101,11 +101,21 @@ The URL specifies the endpoint where signing requests should be submitted.
 
 ### `--force-new-cluster`
 
-This flag forces an existing node that was part of a quorum that was lost to restart as a single node Manager without losing its data
+This flag forces an existing node that was part of a quorum that was lost to restart as a single node Manager without losing its data.
 
 ### `--listen-addr value`
 
-The node listens for inbound Swarm manager traffic on this IP:PORT
+The node listens for inbound Swarm manager traffic on this address. If unspecified, Docker
+will check if the system has a single IP address, and use that IP address with with the
+default port 2377. If the system has multiple IP addresses, `--listen-addr` must be
+specified so that the correct address is chosen for inter-manager communication and overlay
+networking.
+
+It is also possible to specify a network interface to listen on that interface's address;
+for example `--listen-addr eth0:2377`.
+
+Specifying a port is optional. If the value is a bare IP address, hostname, or interface
+name, the default port 2377 will be used.
 
 ### `--secret string`
 

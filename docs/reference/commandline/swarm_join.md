@@ -19,7 +19,7 @@ Join a Swarm as a node and/or manager
 Options:
       --ca-hash string      Hash of the Root Certificate Authority certificate used for trusted join
       --help                Print usage
-      --listen-addr value   Listen address (default 0.0.0.0:2377)
+      --listen-addr value   Listen address
       --manager             Try joining as a manager.
       --secret string       Secret for node acceptance
 ```
@@ -56,7 +56,9 @@ Hash of the Root Certificate Authority certificate used for trusted join.
 
 ### `--listen-addr value`
 
-The node listens for inbound Swarm manager traffic on this IP:PORT
+If the node is a manager, it will listen for inbound Swarm manager traffic on
+this address. If no port is given, the default port 2377 will be used. Specifying
+`--listen-addr` is optional when joining an existing swarm.
 
 ### `--manager`
 
