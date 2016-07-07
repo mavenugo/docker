@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func resolveListenAddr(specifiedAddr string) (string, error) {
+func resolveListenAddr(specifiedAddr string, defaultListenAddr string) (string, error) {
 	specifiedHost, specifiedPort, err := net.SplitHostPort(specifiedAddr)
 	if err != nil {
 		return "", fmt.Errorf("could not parse listen address %s", specifiedAddr)
@@ -24,6 +24,18 @@ func resolveListenAddr(specifiedAddr string) (string, error) {
 
 	ip := net.ParseIP(specifiedHost)
 	if ip != nil && ip.IsUnspecified() {
+		if defaultListenAddr != "" {
+			interfaceAddr, err := resolveInterfaceAddr(defaultListenAddr)
+			if err == nil {
+				return net.JoinHostPort(interfaceAddr.String(), specifiedPort), nil
+			}
+			if err != errNoSuchInterface {
+				return "", err
+			}
+
+			return net.JoinHostPort(defaultListenAddr, specifiedPort), nil
+		}
+
 		systemAddr, err := resolveSystemAddr()
 		if err != nil {
 			return "", err
