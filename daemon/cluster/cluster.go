@@ -82,6 +82,11 @@ type Config struct {
 	Root    string
 	Name    string
 	Backend executorpkg.Backend
+
+	// DefaultListenAddr is the default host/IP or network interface to use
+	// if a wildcard address is specified in the ListenAddr value given to
+	// the /swarm/init endpoint.
+	DefaultListenAddr string
 }
 
 // Cluster provides capabilities to participate in a cluster as a worker or a
@@ -304,7 +309,7 @@ func (c *Cluster) Init(req types.InitRequest) (string, error) {
 		return "", err
 	}
 
-	listenAddr, err := resolveListenAddr(req.ListenAddr)
+	listenAddr, err := resolveListenAddr(req.ListenAddr, c.config.DefaultListenAddr)
 	if err != nil {
 		c.Unlock()
 		return "", err
