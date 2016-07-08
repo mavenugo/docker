@@ -55,7 +55,7 @@ dockerd - Enable daemon mode
 [**-s**|**--storage-driver**[=*STORAGE-DRIVER*]]
 [**--selinux-enabled**]
 [**--storage-opt**[=*[]*]]
-[**--swarm-default-listen-addr**[=*IP|HOSTNAME|INTERFACE*]]
+[**--swarm-default-advertise-addr**[=*IP|HOSTNAME|INTERFACE*]]
 [**--tls**]
 [**--tlscacert**[=*~/.docker/ca.pem*]]
 [**--tlscert**[=*~/.docker/cert.pem*]]
@@ -240,9 +240,10 @@ output otherwise.
 **--storage-opt**=[]
   Set storage driver options. See STORAGE DRIVER OPTIONS.
 
-**--swarm-default-listen-addr**=*IP|HOSTNAME|INTERFACE*
-  Set default address or interface for swarm listening address. This can be a hostname, an IP address, or
-  an interface such as `eth0`. A port cannot be specified with this option.
+**--swarm-default-advertise-addr**=*IP|HOSTNAME|INTERFACE*
+  Set default address or interface for swarm to advertise as its externally-reachable address to other cluster
+  members. This can be a hostname, an IP address, or an interface such as `eth0`. A port cannot be specified with
+  this option.
 
 **--tls**=*true*|*false*
   Use TLS; implied by --tlsverify. Default is false.

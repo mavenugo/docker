@@ -23,7 +23,9 @@ const (
 
 type initOptions struct {
 	swarmOptions
-	listenAddr      NodeAddrOption
+	listenAddr NodeAddrOption
+	// Not a NodeAddrOption because it has no default port.
+	advertiseAddr   string
 	forceNewCluster bool
 }
 
@@ -46,6 +48,7 @@ func newInitCommand(dockerCli *client.DockerCli) *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.Var(&opts.listenAddr, flagListenAddr, "Listen address (format: <ip|hostname|interface>[:port])")
+	flags.StringVar(&opts.advertiseAddr, flagAdvertiseAddr, "", "Advertised address (format: <ip|hostname|interface>[:port])")
 	flags.BoolVar(&opts.forceNewCluster, "force-new-cluster", false, "Force create a new cluster from current state.")
 	addSwarmFlags(flags, &opts.swarmOptions)
 	return cmd
@@ -63,14 +66,15 @@ func runInit(dockerCli *client.DockerCli, flags *pflag.FlagSet, opts initOptions
 
 	req := swarm.InitRequest{
 		ListenAddr:      opts.listenAddr.String(),
+		AdvertiseAddr:   opts.advertiseAddr,
 		ForceNewCluster: opts.forceNewCluster,
 		Spec:            opts.swarmOptions.ToSpec(),
 	}
 
 	nodeID, err := client.SwarmInit(ctx, req)
 	if err != nil {
-		if strings.Contains(err.Error(), "could not choose a listening IP address") || strings.Contains(err.Error(), "could not find the system's IP address") {
-			return errors.New(err.Error() + " - specify one with --listen-addr")
+		if strings.Contains(err.Error(), "could not choose an IP address to advertise") || strings.Contains(err.Error(), "could not find the system's IP address") {
+			return errors.New(err.Error() + " - specify one with --advertise-addr")
 		}
 		return err
 	}

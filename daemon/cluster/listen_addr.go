@@ -6,44 +6,77 @@ import (
 	"net"
 )
 
-func resolveListenAddr(specifiedAddr string, defaultListenAddr string) (string, error) {
+func resolveListenAddr(specifiedAddr string) (string, string, error) {
 	specifiedHost, specifiedPort, err := net.SplitHostPort(specifiedAddr)
 	if err != nil {
-		return "", fmt.Errorf("could not parse listen address %s", specifiedAddr)
+		return "", "", fmt.Errorf("could not parse listen address %s", specifiedAddr)
 	}
 
 	// Does the host component match any of the interface names on the
 	// system? If so, use the address from that interface.
 	interfaceAddr, err := resolveInterfaceAddr(specifiedHost)
 	if err == nil {
-		return net.JoinHostPort(interfaceAddr.String(), specifiedPort), nil
+		return interfaceAddr.String(), specifiedPort, nil
 	}
 	if err != errNoSuchInterface {
-		return "", err
+		return "", "", err
 	}
 
-	ip := net.ParseIP(specifiedHost)
-	if ip != nil && ip.IsUnspecified() {
-		if defaultListenAddr != "" {
-			interfaceAddr, err := resolveInterfaceAddr(defaultListenAddr)
-			if err == nil {
-				return net.JoinHostPort(interfaceAddr.String(), specifiedPort), nil
-			}
-			if err != errNoSuchInterface {
-				return "", err
-			}
+	return specifiedHost, specifiedPort, nil
+}
 
-			return net.JoinHostPort(defaultListenAddr, specifiedPort), nil
+func resolveAdvertiseAddr(advertiseAddr string, defaultAdvertiseAddr string, listenAddrPort string) (string, error) {
+	// Approach:
+	// - If an advertise address is specified, use that. Resolve the
+	//   interface's address if an interface was specified in
+	//   advertiseAddr. Fill in the port from listenAddrPort if necessary.
+	// - If defaultAdvertiseAddr is not empty, use that with the port from
+	//   listenAddrPort. Resolve the interface's address from
+	//   if an interface name was specified in defaultAdvertiseAddr.
+	// - Otherwise, try to autodetect the system's address. Use the port in
+	//   listenAddrPort with this address if autodetection succeeds.
+
+	if advertiseAddr != "" {
+		advertiseHost, advertisePort, err := net.SplitHostPort(advertiseAddr)
+		if err != nil {
+			// Not a host:port specification
+			advertiseHost = advertiseAddr
+			advertisePort = listenAddrPort
 		}
 
-		systemAddr, err := resolveSystemAddr()
-		if err != nil {
+		// Does the host component match any of the interface names on the
+		// system? If so, use the address from that interface.
+		interfaceAddr, err := resolveInterfaceAddr(advertiseHost)
+		if err == nil {
+			return net.JoinHostPort(interfaceAddr.String(), advertisePort), nil
+		}
+		if err != errNoSuchInterface {
 			return "", err
 		}
-		return net.JoinHostPort(systemAddr.String(), specifiedPort), nil
+
+		return net.JoinHostPort(advertiseHost, advertisePort), nil
 	}
 
-	return specifiedAddr, nil
+	if defaultAdvertiseAddr != "" {
+		// Does the default advertise address component match any of the
+		// interface names on the system? If so, use the address from
+		// that interface.
+		interfaceAddr, err := resolveInterfaceAddr(defaultAdvertiseAddr)
+		if err == nil {
+			return net.JoinHostPort(interfaceAddr.String(), listenAddrPort), nil
+		}
+		if err != errNoSuchInterface {
+			return "", err
+		}
+
+		return net.JoinHostPort(defaultAdvertiseAddr, listenAddrPort), nil
+	}
+
+	systemAddr, err := resolveSystemAddr()
+	if err != nil {
+		return "", err
+	}
+	return net.JoinHostPort(systemAddr.String(), listenAddrPort), nil
 }
 
 func resolveInterfaceAddr(specifiedInterface string) (net.IP, error) {
@@ -93,7 +126,7 @@ func resolveInterfaceAddr(specifiedInterface string) (net.IP, error) {
 }
 
 var errNoSuchInterface = errors.New("no such interface")
-var errMultipleIPs = errors.New("could not choose a listening IP address since this system has multiple addresses")
+var errMultipleIPs = errors.New("could not choose an IP address to advertise since this system has multiple addresses")
 var errNoIP = errors.New("could not find the system's IP address")
 
 func resolveSystemAddr() (net.IP, error) {

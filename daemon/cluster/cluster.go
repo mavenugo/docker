@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +75,8 @@ var defaultSpec = types.Spec{
 }
 
 type state struct {
-	ListenAddr string
+	ListenAddr    string
+	AdvertiseAddr string
 }
 
 // Config provides values for Cluster.
@@ -83,10 +85,10 @@ type Config struct {
 	Name    string
 	Backend executorpkg.Backend
 
-	// DefaultListenAddr is the default host/IP or network interface to use
+	// DefaultAdvertiseAddr is the default host/IP or network interface to use
 	// if a wildcard address is specified in the ListenAddr value given to
-	// the /swarm/init endpoint.
-	DefaultListenAddr string
+	// the /swarm/init endpoint, and no AdvertiseAddr value is specified.
+	DefaultAdvertiseAddr string
 }
 
 // Cluster provides capabilities to participate in a cluster as a worker or a
@@ -94,13 +96,14 @@ type Config struct {
 type Cluster struct {
 	sync.RWMutex
 	*node
-	root        string
-	config      Config
-	configEvent chan struct{} // todo: make this array and goroutine safe
-	listenAddr  string
-	stop        bool
-	err         error
-	cancelDelay func()
+	root          string
+	config        Config
+	configEvent   chan struct{} // todo: make this array and goroutine safe
+	listenAddr    string
+	advertiseAddr string
+	stop          bool
+	err           error
+	cancelDelay   func()
 }
 
 type node struct {
@@ -132,7 +135,7 @@ func New(config Config) (*Cluster, error) {
 		return nil, err
 	}
 
-	n, err := c.startNewNode(false, st.ListenAddr, "", "", "", false)
+	n, err := c.startNewNode(false, st.ListenAddr, st.AdvertiseAddr, "", "", "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +171,7 @@ func (c *Cluster) loadState() (*state, error) {
 }
 
 func (c *Cluster) saveState() error {
-	dt, err := json.Marshal(state{ListenAddr: c.listenAddr})
+	dt, err := json.Marshal(state{ListenAddr: c.listenAddr, AdvertiseAddr: c.advertiseAddr})
 	if err != nil {
 		return err
 	}
@@ -201,7 +204,7 @@ func (c *Cluster) reconnectOnFailure(n *node) {
 			return
 		}
 		var err error
-		n, err = c.startNewNode(false, c.listenAddr, c.getRemoteAddress(), "", "", false)
+		n, err = c.startNewNode(false, c.listenAddr, c.advertiseAddr, c.getRemoteAddress(), "", "", false)
 		if err != nil {
 			c.err = err
 			close(n.done)
@@ -210,7 +213,7 @@ func (c *Cluster) reconnectOnFailure(n *node) {
 	}
 }
 
-func (c *Cluster) startNewNode(forceNewCluster bool, listenAddr, joinAddr, secret, cahash string, ismanager bool) (*node, error) {
+func (c *Cluster) startNewNode(forceNewCluster bool, listenAddr, advertiseAddr, joinAddr, secret, cahash string, ismanager bool) (*node, error) {
 	if err := c.config.Backend.IsSwarmCompatible(); err != nil {
 		return nil, err
 	}
@@ -218,18 +221,19 @@ func (c *Cluster) startNewNode(forceNewCluster bool, listenAddr, joinAddr, secre
 	c.cancelDelay = nil
 	c.stop = false
 	n, err := swarmagent.NewNode(&swarmagent.NodeConfig{
-		Hostname:         c.config.Name,
-		ForceNewCluster:  forceNewCluster,
-		ListenControlAPI: filepath.Join(c.root, controlSocket),
-		ListenRemoteAPI:  listenAddr,
-		JoinAddr:         joinAddr,
-		StateDir:         c.root,
-		CAHash:           cahash,
-		Secret:           secret,
-		Executor:         container.NewExecutor(c.config.Backend),
-		HeartbeatTick:    1,
-		ElectionTick:     3,
-		IsManager:        ismanager,
+		Hostname:           c.config.Name,
+		ForceNewCluster:    forceNewCluster,
+		ListenControlAPI:   filepath.Join(c.root, controlSocket),
+		ListenRemoteAPI:    listenAddr,
+		AdvertiseRemoteAPI: advertiseAddr,
+		JoinAddr:           joinAddr,
+		StateDir:           c.root,
+		CAHash:             cahash,
+		Secret:             secret,
+		Executor:           container.NewExecutor(c.config.Backend),
+		HeartbeatTick:      1,
+		ElectionTick:       3,
+		IsManager:          ismanager,
 	})
 	if err != nil {
 		return nil, err
@@ -245,6 +249,7 @@ func (c *Cluster) startNewNode(forceNewCluster bool, listenAddr, joinAddr, secre
 	}
 	c.node = node
 	c.listenAddr = listenAddr
+	c.advertiseAddr = advertiseAddr
 	c.saveState()
 	c.config.Backend.SetClusterProvider(c)
 	go func() {
@@ -309,14 +314,20 @@ func (c *Cluster) Init(req types.InitRequest) (string, error) {
 		return "", err
 	}
 
-	listenAddr, err := resolveListenAddr(req.ListenAddr, c.config.DefaultListenAddr)
+	listenHost, listenPort, err := resolveListenAddr(req.ListenAddr)
+	if err != nil {
+		c.Unlock()
+		return "", err
+	}
+
+	advertiseAddr, err := resolveAdvertiseAddr(req.AdvertiseAddr, c.config.DefaultAdvertiseAddr, listenPort)
 	if err != nil {
 		c.Unlock()
 		return "", err
 	}
 
 	// todo: check current state existing
-	n, err := c.startNewNode(req.ForceNewCluster, listenAddr, "", "", "", false)
+	n, err := c.startNewNode(req.ForceNewCluster, net.JoinHostPort(listenHost, listenPort), advertiseAddr, "", "", "", false)
 	if err != nil {
 		c.Unlock()
 		return "", err
@@ -354,8 +365,21 @@ func (c *Cluster) Join(req types.JoinRequest) error {
 		return err
 	}
 
+	listenHost, listenPort, err := resolveListenAddr(req.ListenAddr)
+	if err != nil {
+		c.Unlock()
+		return err
+	}
+
+	advertiseAddr, err := resolveAdvertiseAddr(req.AdvertiseAddr, c.config.DefaultAdvertiseAddr, listenPort)
+	if err != nil {
+		// For joining, we don't need to provide an advertise address,
+		// since the remote side can detect it.
+		advertiseAddr = ""
+	}
+
 	// todo: check current state existing
-	n, err := c.startNewNode(false, req.ListenAddr, req.RemoteAddrs[0], req.Secret, req.CACertHash, req.Manager)
+	n, err := c.startNewNode(false, net.JoinHostPort(listenHost, listenPort), advertiseAddr, req.RemoteAddrs[0], req.Secret, req.CACertHash, req.Manager)
 	if err != nil {
 		c.Unlock()
 		return err
@@ -570,6 +594,10 @@ func (c *Cluster) GetRemoteAddress() string {
 }
 
 func (c *Cluster) getRemoteAddress() string {
+	if c.advertiseAddr != "" {
+		return c.advertiseAddr
+	}
+
 	if c.node == nil {
 		return ""
 	}

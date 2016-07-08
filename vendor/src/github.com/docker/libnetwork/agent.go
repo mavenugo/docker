@@ -240,19 +240,6 @@ func (c *controller) agentSetup() error {
 	remote := clusterProvider.GetRemoteAddress()
 	remoteAddr, _, _ := net.SplitHostPort(remote)
 
-	// Determine the BindAddress from RemoteAddress or through best-effort routing
-	if !isValidClusteringIP(bindAddr) {
-		if !isValidClusteringIP(remoteAddr) {
-			remote = "8.8.8.8:53"
-		}
-		conn, err := net.Dial("udp", remote)
-		if err == nil {
-			bindHostPort := conn.LocalAddr().String()
-			bindAddr, _, _ = net.SplitHostPort(bindHostPort)
-			conn.Close()
-		}
-	}
-
 	if bindAddr != "" && c.agent == nil {
 		if err := c.agentInit(bindAddr); err != nil {
 			logrus.Errorf("Error in agentInit : %v", err)
