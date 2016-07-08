@@ -1193,6 +1193,7 @@ __docker_swarm_subcommand() {
         (init)
             _arguments $(__docker_arguments) \
                 $opts_help \
+                "($help)--advertise-addr[Advertised address]:ip\:port: " \
                 "($help)--auto-accept=[Acceptance policy]:policy:(manager none worker)" \
                 "($help)*--external-ca=[Specifications of one or more certificate signing endpoints]:endpoint: " \
                 "($help)--force-new-cluster[Force create a new cluster from current state]" \
@@ -1207,6 +1208,7 @@ __docker_swarm_subcommand() {
         (join)
             _arguments $(__docker_arguments) \
                 $opts_help \
+                "($help)--advertise-addr[Advertised address]:ip\:port: " \
                 "($help)--ca-hash=[Hash of the Root Certificate Authority certificate used for trusted join]:hash: " \
                 "($help)--listen-addr[Listen address]:ip\:port: " \
                 "($help)--manager[Try joining as a manager]" \

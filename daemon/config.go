@@ -128,10 +128,11 @@ type CommonConfig struct {
 	// deserialization without the full struct.
 	CommonTLSOptions
 
-	// SwarmDefaultListenAddr is the default host/IP or network interface
+	// SwarmDefaultAdvertiseAddr is the default host/IP or network interface
 	// to use if a wildcard address is specified in the ListenAddr value
-	// given to the /swarm/init endpoint.
-	SwarmDefaultListenAddr string `json:"swarm-default-listen-addr"`
+	// given to the /swarm/init endpoint and no advertise address is
+	// specified.
+	SwarmDefaultAdvertiseAddr string `json:"swarm-default-advertise-addr"`
 
 	LogConfig
 	bridgeConfig // bridgeConfig holds bridge network specific configuration.
@@ -173,7 +174,7 @@ func (config *Config) InstallCommonFlags(cmd *flag.FlagSet, usageFn func(string)
 	cmd.IntVar(&maxConcurrentDownloads, []string{"-max-concurrent-downloads"}, defaultMaxConcurrentDownloads, usageFn("Set the max concurrent downloads for each pull"))
 	cmd.IntVar(&maxConcurrentUploads, []string{"-max-concurrent-uploads"}, defaultMaxConcurrentUploads, usageFn("Set the max concurrent uploads for each push"))
 
-	cmd.StringVar(&config.SwarmDefaultListenAddr, []string{"-swarm-default-listen-addr"}, "", usageFn("Set default address or interface for swarm listening address"))
+	cmd.StringVar(&config.SwarmDefaultAdvertiseAddr, []string{"-swarm-default-advertise-addr"}, "", usageFn("Set default address or interface for swarm advertised address"))
 
 	config.MaxConcurrentDownloads = &maxConcurrentDownloads
 	config.MaxConcurrentUploads = &maxConcurrentUploads

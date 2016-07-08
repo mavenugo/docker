@@ -274,10 +274,10 @@ func (cli *DaemonCli) start() (err error) {
 	name, _ := os.Hostname()
 
 	c, err := cluster.New(cluster.Config{
-		Root:              cli.Config.Root,
-		Name:              name,
-		Backend:           d,
-		DefaultListenAddr: cli.Config.SwarmDefaultListenAddr,
+		Root:                 cli.Config.Root,
+		Name:                 name,
+		Backend:              d,
+		DefaultAdvertiseAddr: cli.Config.SwarmDefaultAdvertiseAddr,
 	})
 	if err != nil {
 		logrus.Fatalf("Error creating cluster component: %v", err)
