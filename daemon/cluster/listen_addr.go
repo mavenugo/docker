@@ -4,7 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 )
+
+var ignoredInterfacePrefixes = []string{
+	"docker",
+}
 
 func resolveListenAddr(specifiedAddr string) (string, string, error) {
 	specifiedHost, specifiedPort, err := net.SplitHostPort(specifiedAddr)
@@ -139,10 +144,18 @@ func resolveSystemAddr() (net.IP, error) {
 
 	var systemAddr net.IP
 
+ifaceLoop:
 	for _, intf := range interfaces {
 		// Skip inactive interfaces and loopback interfaces
 		if (intf.Flags&net.FlagUp == 0) || (intf.Flags&net.FlagLoopback) != 0 {
 			continue
+		}
+
+		// Skip interfaces with names matching the ignore list
+		for _, prefix := range ignoredInterfacePrefixes {
+			if strings.HasPrefix(intf.Name, prefix) {
+				continue ifaceLoop
+			}
 		}
 
 		addrs, err := intf.Addrs()
