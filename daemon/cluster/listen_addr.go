@@ -11,6 +11,13 @@ var ignoredInterfacePrefixes = []string{
 	"docker",
 }
 
+var (
+	errNoSuchInterface       = errors.New("no such interface")
+	errMultipleIPs           = errors.New("could not choose an IP address to advertise since this system has multiple addresses")
+	errNoIP                  = errors.New("could not find the system's IP address")
+	errMustSpecifyListenAddr = errors.New("must specify a listening address because the address to advertise is not recognized as a system address")
+)
+
 func resolveListenAddr(specifiedAddr string) (string, string, error) {
 	specifiedHost, specifiedPort, err := net.SplitHostPort(specifiedAddr)
 	if err != nil {
@@ -30,7 +37,7 @@ func resolveListenAddr(specifiedAddr string) (string, string, error) {
 	return specifiedHost, specifiedPort, nil
 }
 
-func resolveAdvertiseAddr(advertiseAddr string, defaultAdvertiseAddr string, listenAddrPort string) (string, error) {
+func resolveAdvertiseAddr(advertiseAddr, defaultAdvertiseAddr, listenAddrPort string) (string, string, error) {
 	// Approach:
 	// - If an advertise address is specified, use that. Resolve the
 	//   interface's address if an interface was specified in
@@ -53,13 +60,13 @@ func resolveAdvertiseAddr(advertiseAddr string, defaultAdvertiseAddr string, lis
 		// system? If so, use the address from that interface.
 		interfaceAddr, err := resolveInterfaceAddr(advertiseHost)
 		if err == nil {
-			return net.JoinHostPort(interfaceAddr.String(), advertisePort), nil
+			return interfaceAddr.String(), advertisePort, nil
 		}
 		if err != errNoSuchInterface {
-			return "", err
+			return "", "", err
 		}
 
-		return net.JoinHostPort(advertiseHost, advertisePort), nil
+		return advertiseHost, advertisePort, nil
 	}
 
 	if defaultAdvertiseAddr != "" {
@@ -68,20 +75,20 @@ func resolveAdvertiseAddr(advertiseAddr string, defaultAdvertiseAddr string, lis
 		// that interface.
 		interfaceAddr, err := resolveInterfaceAddr(defaultAdvertiseAddr)
 		if err == nil {
-			return net.JoinHostPort(interfaceAddr.String(), listenAddrPort), nil
+			return interfaceAddr.String(), listenAddrPort, nil
 		}
 		if err != errNoSuchInterface {
-			return "", err
+			return "", "", err
 		}
 
-		return net.JoinHostPort(defaultAdvertiseAddr, listenAddrPort), nil
+		return defaultAdvertiseAddr, listenAddrPort, nil
 	}
 
 	systemAddr, err := resolveSystemAddr()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return net.JoinHostPort(systemAddr.String(), listenAddrPort), nil
+	return systemAddr.String(), listenAddrPort, nil
 }
 
 func resolveInterfaceAddr(specifiedInterface string) (net.IP, error) {
@@ -129,10 +136,6 @@ func resolveInterfaceAddr(specifiedInterface string) (net.IP, error) {
 	}
 	return interfaceAddr6, nil
 }
-
-var errNoSuchInterface = errors.New("no such interface")
-var errMultipleIPs = errors.New("could not choose an IP address to advertise since this system has multiple addresses")
-var errNoIP = errors.New("could not find the system's IP address")
 
 func resolveSystemAddr() (net.IP, error) {
 	// Use the system's only IP address, or fail if there are
@@ -206,4 +209,30 @@ ifaceLoop:
 	}
 
 	return systemAddr, nil
+}
+
+func listSystemIPs() []net.IP {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+
+	var systemAddrs []net.IP
+
+	for _, intf := range interfaces {
+		addrs, err := intf.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			ipAddr, ok := addr.(*net.IPNet)
+
+			if ok {
+				systemAddrs = append(systemAddrs, ipAddr.IP)
+			}
+		}
+	}
+
+	return systemAddrs
 }
