@@ -320,14 +320,40 @@ func (c *Cluster) Init(req types.InitRequest) (string, error) {
 		return "", err
 	}
 
-	advertiseAddr, err := resolveAdvertiseAddr(req.AdvertiseAddr, c.config.DefaultAdvertiseAddr, listenPort)
+	advertiseHost, advertisePort, err := resolveAdvertiseAddr(req.AdvertiseAddr, c.config.DefaultAdvertiseAddr, listenPort)
 	if err != nil {
 		c.Unlock()
 		return "", err
 	}
 
+	// If the advertise address is not one of the system's
+	// addresses, we also require a listen address.
+	listenAddrIP := net.ParseIP(listenHost)
+	if listenAddrIP != nil && listenAddrIP.IsUnspecified() {
+		advertiseIP := net.ParseIP(advertiseHost)
+		if advertiseIP == nil {
+			// not an IP
+			c.Unlock()
+			return "", errMustSpecifyListenAddr
+		}
+
+		systemIPs := listSystemIPs()
+
+		found := false
+		for _, systemIP := range systemIPs {
+			if systemIP.Equal(advertiseIP) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			c.Unlock()
+			return "", errMustSpecifyListenAddr
+		}
+	}
+
 	// todo: check current state existing
-	n, err := c.startNewNode(req.ForceNewCluster, net.JoinHostPort(listenHost, listenPort), advertiseAddr, "", "", "", false)
+	n, err := c.startNewNode(req.ForceNewCluster, net.JoinHostPort(listenHost, listenPort), net.JoinHostPort(advertiseHost, advertisePort), "", "", "", false)
 	if err != nil {
 		c.Unlock()
 		return "", err
@@ -371,11 +397,12 @@ func (c *Cluster) Join(req types.JoinRequest) error {
 		return err
 	}
 
-	advertiseAddr, err := resolveAdvertiseAddr(req.AdvertiseAddr, c.config.DefaultAdvertiseAddr, listenPort)
-	if err != nil {
-		// For joining, we don't need to provide an advertise address,
-		// since the remote side can detect it.
-		advertiseAddr = ""
+	var advertiseAddr string
+	advertiseHost, advertisePort, err := resolveAdvertiseAddr(req.AdvertiseAddr, c.config.DefaultAdvertiseAddr, listenPort)
+	// For joining, we don't need to provide an advertise address,
+	// since the remote side can detect it.
+	if err == nil {
+		advertiseAddr = net.JoinHostPort(advertiseHost, advertisePort)
 	}
 
 	// todo: check current state existing
