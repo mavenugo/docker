@@ -34,7 +34,7 @@ func (b ByTime) Less(i, j int) bool { return b[i].LamportTime < b[j].LamportTime
 
 type agent struct {
 	networkDB         *networkdb.NetworkDB
-	bindAddr          string
+	advertiseAddr     string
 	epTblCancel       func()
 	driverCancelFuncs map[string][]func()
 }
@@ -236,12 +236,12 @@ func (c *controller) handleKeyChangeV1(keys []*types.EncryptionKey) error {
 func (c *controller) agentSetup() error {
 	clusterProvider := c.cfg.Daemon.ClusterProvider
 
-	bindAddr, _, _ := net.SplitHostPort(clusterProvider.GetListenAddress())
+	advAddr, _, _ := net.SplitHostPort(clusterProvider.GetAdvertiseAddress())
 	remote := clusterProvider.GetRemoteAddress()
 	remoteAddr, _, _ := net.SplitHostPort(remote)
 
-	if bindAddr != "" && c.agent == nil {
-		if err := c.agentInit(bindAddr); err != nil {
+	if advAddr != "" && c.agent == nil {
+		if err := c.agentInit(advAddr); err != nil {
 			logrus.Errorf("Error in agentInit : %v", err)
 		} else {
 			c.drvRegistry.WalkDrivers(func(name string, driver driverapi.Driver, capability driverapi.Capability) bool {
@@ -299,22 +299,17 @@ func (c *controller) getPrimaryKeyTag(subsys string) ([]byte, uint64) {
 	return keys[1].Key, keys[1].LamportTime
 }
 
-func (c *controller) agentInit(bindAddrOrInterface string) error {
+func (c *controller) agentInit(advertiseAddr string) error {
 	if !c.isAgent() {
 		return nil
-	}
-
-	bindAddr, err := resolveAddr(bindAddrOrInterface)
-	if err != nil {
-		return err
 	}
 
 	keys, tags := c.getKeys(subsysGossip)
 	hostname, _ := os.Hostname()
 	nDB, err := networkdb.New(&networkdb.Config{
-		BindAddr: bindAddr,
-		NodeName: hostname,
-		Keys:     keys,
+		AdvertiseAddr: advertiseAddr,
+		NodeName:      hostname,
+		Keys:          keys,
 	})
 
 	if err != nil {
@@ -325,7 +320,7 @@ func (c *controller) agentInit(bindAddrOrInterface string) error {
 
 	c.agent = &agent{
 		networkDB:         nDB,
-		bindAddr:          bindAddr,
+		advertiseAddr:     advertiseAddr,
 		epTblCancel:       cancel,
 		driverCancelFuncs: make(map[string][]func()),
 	}
@@ -364,7 +359,7 @@ func (c *controller) agentDriverNotify(d driverapi.Driver) {
 	}
 
 	d.DiscoverNew(discoverapi.NodeDiscovery, discoverapi.NodeDiscoveryData{
-		Address: c.agent.bindAddr,
+		Address: c.agent.advertiseAddr,
 		Self:    true,
 	})
 

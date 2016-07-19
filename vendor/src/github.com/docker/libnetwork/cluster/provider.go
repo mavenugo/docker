@@ -4,7 +4,7 @@ package cluster
 type Provider interface {
 	IsManager() bool
 	IsAgent() bool
-	GetListenAddress() string
+	GetAdvertiseAddress() string
 	GetRemoteAddress() string
 	ListenClusterEvents() <-chan struct{}
 }
