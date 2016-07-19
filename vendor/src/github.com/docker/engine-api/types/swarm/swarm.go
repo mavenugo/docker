@@ -112,7 +112,8 @@ const (
 
 // Info represents generic information about swarm.
 type Info struct {
-	NodeID string
+	NodeID   string
+	NodeAddr string
 
 	LocalNodeState   LocalNodeState
 	ControlAvailable bool
