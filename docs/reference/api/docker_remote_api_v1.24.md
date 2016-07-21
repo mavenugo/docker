@@ -3593,6 +3593,7 @@ Initialize a new Swarm
 
     {
       "ListenAddr": "0.0.0.0:4500",
+      "AdvertiseAddr": "192.168.1.1:4500",
       "ForceNewCluster": false,
       "Spec": {
         "AcceptancePolicy": {
@@ -3633,6 +3634,11 @@ JSON Parameters:
   address/port combination in the form `192.168.1.1:4567`, or an interface followed by a port
   number, like `eth0:4567`. If the port number is omitted, the default swarm listening port is
   used.
+- **AdvertiseAddr** – Externally reachable address advertised to other nodes. This can either be
+  an address/port combination in the form `192.168.1.1:4567`, or an interface followed by a port
+  number, like `eth0:4567`. If the port number is omitted, the port number from the listen
+  address is used. If `AdvertiseAddr` is not specified, it will be automatically detected when
+  possible.
 - **ForceNewCluster** – Force creating a new Swarm even if already part of one.
 - **Spec** – Configuration settings of the new Swarm.
     - **Policies** – An array of acceptance policies.
@@ -3678,6 +3684,7 @@ Join an existing new Swarm
 
     {
       "ListenAddr": "0.0.0.0:4500",
+      "AdvertiseAddr: "192.168.1.1:4500",
       "RemoteAddrs": ["node1:4500"],
       "Secret": "",
       "CACertHash": "",
@@ -3700,6 +3707,11 @@ JSON Parameters:
 
 - **ListenAddr** – Listen address used for inter-manager communication if the node gets promoted to
   manager, as well as determining the networking interface used for the VXLAN Tunnel Endpoint (VTEP).
+- **AdvertiseAddr** – Externally reachable address advertised to other nodes. This can either be
+  an address/port combination in the form `192.168.1.1:4567`, or an interface followed by a port
+  number, like `eth0:4567`. If the port number is omitted, the port number from the listen
+  address is used. If `AdvertiseAddr` is not specified, it will be automatically detected when
+  possible.
 - **RemoteAddr** – Address of any manager node already participating in the Swarm to join.
 - **Secret** – Secret token for joining this Swarm.
 - **CACertHash** – Optional hash of the root CA to avoid relying on trust on first use.

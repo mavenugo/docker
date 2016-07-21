@@ -37,7 +37,7 @@ func newJoinCommand(dockerCli *client.DockerCli) *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.Var(&opts.listenAddr, flagListenAddr, "Listen address")
-	flags.StringVar(&opts.advertiseAddr, flagAdvertiseAddr, "", "Advertised address (format: <ip|hostname|interface>[:port])")
+	flags.StringVar(&opts.advertiseAddr, flagAdvertiseAddr, "", "Advertised address (format: <ip|interface>[:port])")
 	flags.BoolVar(&opts.manager, "manager", false, "Try joining as a manager.")
 	flags.StringVar(&opts.secret, flagSecret, "", "Secret for node acceptance")
 	flags.StringVar(&opts.CACertHash, "ca-hash", "", "Hash of the Root Certificate Authority certificate used for trusted join")
