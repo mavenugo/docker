@@ -241,8 +241,8 @@ func (c *Cluster) startNewNode(forceNewCluster bool, localAddr, remoteAddr, list
 		return nil, err
 	}
 
-	var actualLocalAddr string
-	if localAddr == "" {
+	actualLocalAddr := localAddr
+	if actualLocalAddr == "" {
 		// If localAddr was not specified, resolve it automatically
 		// based on the route to joinAddr. localAddr can only be left
 		// empty on "join".
