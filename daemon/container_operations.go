@@ -352,9 +352,6 @@ func (daemon *Daemon) updateContainerNetworkSettings(container *container.Contai
 		if err != nil {
 			return err
 		}
-		if !container.Managed && n.Info().Dynamic() {
-			return errClusterNetworkOnRun(networkName)
-		}
 		networkName = n.Name()
 	}
 	if container.NetworkSettings == nil {
