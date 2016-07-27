@@ -41,6 +41,7 @@ be found.
 ### Networking
 
 + Built-in Virtual-IP based  internal and ingress load-balancing using IPVS [#23361](https://github.com/docker/docker/pull/23361)
++ Routing Mesh using ingress overlay network [#23361](https://github.com/docker/docker/pull/23361)
 + Secured multi-host overlay networking using encrypted control-plane and Data-plane [#23361](https://github.com/docker/docker/pull/23361)
 + MacVlan driver is out of experimental [#23524](https://github.com/docker/docker/pull/23524)
 + Add `driver` filter to `network ls` [#22319](https://github.com/docker/docker/pull/22319)
