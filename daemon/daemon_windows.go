@@ -215,9 +215,12 @@ func (daemon *Daemon) initNetworkController(config *Config, activeSandboxes map[
 		}
 
 		if !found {
-			err = v.Delete()
-			if err != nil {
-				return nil, err
+			// overlay networks are global and should not be deleted by local HNS
+			if v.Type() != "overlay" {
+				err = v.Delete()
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -242,6 +245,11 @@ func (daemon *Daemon) initNetworkController(config *Config, activeSandboxes map[
 	// discover and add HNS networks to windows
 	// network that exist are removed and added again
 	for _, v := range hnsresponse {
+		if strings.ToLower(v.Type) == "overlay" {
+			// Skip overlay networks
+			continue
+		}
+
 		var n libnetwork.Network
 		s := func(current libnetwork.Network) bool {
 			options := current.Info().DriverOptions()
