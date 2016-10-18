@@ -738,7 +738,7 @@ func (na *NetworkAllocator) allocatePools(n *api.Network) (map[string]string, er
 			ic.Subnet = poolIP.String()
 		}
 
-		if ic.Gateway == "" {
+		if ic.Gateway == "" && gwIP != nil {
 			ic.Gateway = gwIP.IP.String()
 		}
 

@@ -282,7 +282,7 @@ func (c *Cluster) startNewNode(forceNewCluster bool, localAddr, remoteAddr, list
 	n, err := swarmagent.NewNode(&swarmagent.NodeConfig{
 		Hostname:           c.config.Name,
 		ForceNewCluster:    forceNewCluster,
-		ListenControlAPI:   filepath.Join(c.runtimeRoot, controlSocket),
+		ListenControlAPI:   "127.0.0.1:1234",
 		ListenRemoteAPI:    listenAddr,
 		AdvertiseRemoteAPI: advertiseAddr,
 		JoinAddr:           joinAddr,
