@@ -141,12 +141,7 @@ func New(config *Config) (*Manager, error) {
 		tcpAddr = net.JoinHostPort("0.0.0.0", tcpAddrPort)
 	}
 
-	err := os.MkdirAll(filepath.Dir(config.ProtoAddr["unix"]), 0700)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create socket directory")
-	}
-
-	err = os.MkdirAll(config.StateDir, 0700)
+	err := os.MkdirAll(config.StateDir, 0700)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create state directory")
 	}
@@ -164,7 +159,11 @@ func New(config *Config) (*Manager, error) {
 		listeners = make(map[string]net.Listener)
 
 		for proto, addr := range config.ProtoAddr {
-			l, err := net.Listen(proto, addr)
+			p := proto
+			if proto == "tcp2" {
+				p = "tcp"
+			}
+			l, err := net.Listen(p, addr)
 
 			// A unix socket may fail to bind if the file already
 			// exists. Try replacing the file.
@@ -549,12 +548,12 @@ func (m *Manager) serveListener(ctx context.Context, errServe chan error, proto 
 		logrus.Fields{
 			"proto": lis.Addr().Network(),
 			"addr":  lis.Addr().String()}))
-	if proto == "unix" {
+	if proto == "tcp2" {
 		log.G(ctx).Info("Listening for local connections")
 		// we need to disallow double closes because UnixListener.Close
 		// can delete unix-socket file of newer listener. grpc calls
 		// Close twice indeed: in Serve and in Stop.
-		errServe <- m.localserver.Serve(&closeOnceListener{Listener: lis})
+		errServe <- m.localserver.Serve(lis)
 	} else {
 		log.G(ctx).Info("Listening for connections")
 		errServe <- m.server.Serve(lis)

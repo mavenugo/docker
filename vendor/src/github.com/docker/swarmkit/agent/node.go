@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -527,10 +526,7 @@ func (n *Node) initManagerConnection(ctx context.Context, ready chan<- struct{})
 	// Using listen address instead of advertised address because this is a
 	// local connection.
 	addr := n.config.ListenControlAPI
-	opts = append(opts, grpc.WithDialer(
-		func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
-		}))
+	// opts = append(opts, grpc.WithInsecure())
 	conn, err := grpc.Dial(addr, opts...)
 	if err != nil {
 		return err
@@ -595,7 +591,7 @@ func (n *Node) runManager(ctx context.Context, securityConfig *ca.SecurityConfig
 			ForceNewCluster: n.config.ForceNewCluster,
 			ProtoAddr: map[string]string{
 				"tcp":  n.config.ListenRemoteAPI,
-				"unix": n.config.ListenControlAPI,
+				"tcp2": n.config.ListenControlAPI,
 			},
 			AdvertiseAddr:  n.config.AdvertiseRemoteAPI,
 			SecurityConfig: securityConfig,
