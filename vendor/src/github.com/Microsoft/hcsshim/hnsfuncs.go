@@ -30,6 +30,11 @@ type VsidPolicy struct {
 	VSID uint
 }
 
+type PaPolicy struct {
+	Type string
+	PA   string
+}
+
 // Subnet is assoicated with a network and represents a list
 // of subnets available to the network
 type Subnet struct {
@@ -51,6 +56,7 @@ type HNSNetwork struct {
 	Name                 string            `json:",omitempty"`
 	Type                 string            `json:",omitempty"`
 	NetworkAdapterName   string            `json:",omitempty"`
+	ManagementIP         string            `json:",omitempty"`
 	SourceMac            string            `json:",omitempty"`
 	Policies             []json.RawMessage `json:",omitempty"`
 	MacPools             []MacPool         `json:",omitempty"`
@@ -74,6 +80,7 @@ type HNSEndpoint struct {
 	GatewayAddress     string            `json:",omitempty"`
 	EnableInternalDNS  bool              `json:",omitempty"`
 	PrefixLength       uint8             `json:",omitempty"`
+	IsLocalEndpoint    bool              `json:",omitempty"`
 }
 
 type hnsNetworkResponse struct {
