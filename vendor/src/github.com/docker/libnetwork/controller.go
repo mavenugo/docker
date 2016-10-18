@@ -49,7 +49,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
@@ -641,7 +640,6 @@ func (c *controller) NewNetwork(networkType, name string, id string, options ...
 		generic:     map[string]interface{}{netlabel.GenericData: make(map[string]string)},
 		ipamType:    ipamapi.DefaultIPAM,
 		id:          id,
-		created:     time.Now(),
 		ctrlr:       c,
 		persist:     true,
 		drvOnce:     &sync.Once{},
@@ -884,9 +882,8 @@ func (c *controller) NewSandbox(containerID string, options ...SandboxOption) (s
 		if s.containerID == containerID {
 			// If not a stub, then we already have a complete sandbox.
 			if !s.isStub {
-				sbID := s.ID()
 				c.Unlock()
-				return nil, types.ForbiddenErrorf("container %s is already present in sandbox %s", containerID, sbID)
+				return nil, types.ForbiddenErrorf("container %s is already present: %v", containerID, s)
 			}
 
 			// We already have a stub sandbox from the
