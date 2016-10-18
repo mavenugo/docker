@@ -4,6 +4,7 @@ package libnetwork
 
 import (
 	"runtime"
+	"time"
 
 	"github.com/Microsoft/hcsshim"
 	log "github.com/Sirupsen/logrus"
@@ -38,13 +39,19 @@ func (n *network) startResolver() {
 
 		for _, subnet := range hnsresponse.Subnets {
 			if subnet.GatewayAddress != "" {
-				resolver := NewResolver(subnet.GatewayAddress, false, "", n)
-				log.Debugf("Binding a resolver on network %s gateway %s", n.Name(), subnet.GatewayAddress)
-				executeInCompartment(hnsresponse.DNSServerCompartment, resolver.SetupFunc(53))
-				if err = resolver.Start(); err != nil {
-					log.Errorf("Resolver Setup/Start failed for container %s, %q", n.Name(), err)
-				} else {
-					n.resolver = append(n.resolver, resolver)
+				for i := 0; i < 3; i++ {
+					resolver := NewResolver(subnet.GatewayAddress, false, "", n)
+					log.Debugf("Binding a resolver on network %s gateway %s", n.Name(), subnet.GatewayAddress)
+					executeInCompartment(hnsresponse.DNSServerCompartment, resolver.SetupFunc(53))
+
+					if err = resolver.Start(); err != nil {
+						log.Errorf("Resolver Setup/Start failed for container %s, %q", n.Name(), err)
+						time.Sleep(1 * time.Second)
+					} else {
+						log.Debugf("Resolver bound successfuly for network %s", n.Name())
+						n.resolver = append(n.resolver, resolver)
+						break
+					}
 				}
 			}
 		}
