@@ -526,7 +526,6 @@ func (n *Node) initManagerConnection(ctx context.Context, ready chan<- struct{})
 	// Using listen address instead of advertised address because this is a
 	// local connection.
 	addr := n.config.ListenControlAPI
-	// opts = append(opts, grpc.WithInsecure())
 	conn, err := grpc.Dial(addr, opts...)
 	if err != nil {
 		return err
