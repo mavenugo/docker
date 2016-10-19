@@ -9,8 +9,6 @@ import (
 	"github.com/docker/libnetwork/ipam"
 	"github.com/docker/libnetwork/ipamapi"
 	"github.com/docker/libnetwork/ipamutils"
-
-	windowsipam "github.com/docker/libnetwork/ipams/windowsipam"
 )
 
 // InitLinuxDefault registers the built-in ipam service with libnetwork
@@ -41,17 +39,20 @@ func InitLinuxDefault(ic ipamapi.Callback, l, g interface{}) error {
 
 	cps := &ipamapi.Capability{RequiresRequestReplay: true}
 
-	return ic.RegisterIpamDriverWithCapabilities("linuxdefault", a, cps)
+	return ic.RegisterIpamDriverWithCapabilities(ipamapi.DefaultIPAM, a, cps)
 }
 
 // Init registers the built-in ipam service with libnetwork
 func Init(ic ipamapi.Callback, l, g interface{}) error {
-	initFunc := windowsipam.GetInit(ipamapi.DefaultIPAM)
+	return InitLinuxDefault(ic, l, g)
+	/*
+		initFunc := windowsipam.GetInit(ipamapi.DefaultIPAM)
 
-	err := InitLinuxDefault(ic, l, g)
-	if err != nil {
-		return err
-	}
+		err := InitLinuxDefault(ic, l, g)
+		if err != nil {
+			return err
+		}
 
-	return initFunc(ic, l, g)
+		return initFunc(ic, l, g)
+	*/
 }
