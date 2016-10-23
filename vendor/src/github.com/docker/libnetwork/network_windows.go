@@ -9,6 +9,8 @@ import (
 	"github.com/Microsoft/hcsshim"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/libnetwork/drivers/windows"
+	"github.com/docker/libnetwork/ipamapi"
+	"github.com/docker/libnetwork/ipams/windowsipam"
 )
 
 func executeInCompartment(compartmentID uint32, x func()) {
@@ -56,4 +58,11 @@ func (n *network) startResolver() {
 			}
 		}
 	})
+}
+
+func defaultIpamForNetworkType(networkType string) string {
+	if windows.IsBuiltinLocalDriver(networkType) {
+		return windowsipam.DefaultIPAM
+	}
+	return ipamapi.DefaultIPAM
 }
