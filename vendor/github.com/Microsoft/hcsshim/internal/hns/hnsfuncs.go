@@ -29,6 +29,7 @@ func hnsCall(method, path, request string, returnResponse interface{}) error {
 	}
 
 	if len(hnsresponse.Output) == 0 {
+		logrus.Debugf("RETURNING nil Network Response for [%s]=>[%s] Request : %s", method, path, request)
 		return nil
 	}
 
